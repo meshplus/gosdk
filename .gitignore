@@ -6,3 +6,4 @@ node_modules/
 logs/
 account/*.txt
 go.sum
+package-lock.json

@@ -6,18 +6,6 @@ To get more information you can view [docs](docs/hyperchain_gosdk_document.md), 
 
 ## Get started
 
-### Prepare Dependency
-
-You can use it go.mod Managing gosdk dependencies
-
-``` go
-require(
-		github.com/meshplus/gosdk v1.4.0
-)
-```
-
-It's better to use latest sdk to send transaction, now it will be compatible with hyperchain 1.0 and 2.0
-
 ### Contract Deploy & Invoke
 
 Before invoke Contract, you should deploy contract at first step
