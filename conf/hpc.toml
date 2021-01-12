@@ -1,0 +1,79 @@
+title = "GoSDK configuratoin file"
+
+namespace = "global"
+
+#发送重新连接请求间隔(/ms)
+reConnectTime = 10000
+
+[jsonRPC]
+    # local environment
+    nodes = ["localhost","localhost","localhost","localhost"]
+
+    # JsonRpc connect port
+    # local ports
+   ports = ["8081", "8082", "8083", "8084"]
+
+[webSocket]
+    # webSocket connect port
+    ports = ["10001", "10002", "10003", "10004"]
+
+[polling]
+    #重发次数
+    resendTime = 10
+    #第一次轮训时间间隔 unit /ms
+    firstPollingInterval = 100
+    #发送一次,第一次轮训的次数
+    firstPollingTimes = 10
+    #第二次轮训时间间隔 unit /ms
+    secondPollingInterval = 1000
+    #发送一次,第二次轮训的次数
+    secondPollingTimes = 10
+
+[privacy]
+    #send Tcert during the request or not
+    sendTcert = true
+    #if sendTcert is true , you should add follow path.
+    #the paths followed are relative to conf root path
+    sdkcertPath = "certs/sdkcert.cert"
+    sdkcertPrivPath = "certs/sdkcert.priv"
+#    sdkcertPath = "certs/sdkcert_cfca.cert"
+#    sdkcertPrivPath = "certs/sdkcert_cfca.priv"
+    uniquePubPath = "certs/unique.pub"
+    uniquePrivPath = "certs/unique.priv"
+    cfca = true
+
+[security]
+    #Use Https
+    https = false
+    #If https is true, you shoule add follow properties
+    #the paths followed are relative to conf root path
+    tlsca = "certs/tls/tlsca.ca"
+    tlspeerCert = "certs/tls/tls_peer.cert"
+    tlspeerPriv = "certs/tls/tls_peer.priv"
+
+[log]
+    #设置日志输出门槛
+    #"CRITICAL","ERROR","WARNING","NOTICE","INFO","DEBUG",
+    log_level = "INFO"
+    #存放日志文件夹
+    log_dir = "../logs"
+
+[transport]
+   	# MaxIdleConns controls the maximum number of idle (keep-alive)
+	# connections across all hosts. Zero means no limit.
+    maxIdleConns = 0
+	# MaxIdleConnsPerHost, if non-zero, controls the maximum idle
+	# (keep-alive) connections to keep per-host. If zero,
+	# DefaultMaxIdleConnsPerHost is used.
+	maxIdleConnsPerHost = 10
+[inspector]
+    enable = true
+    defaultAccount = "keystore/0xfc546753921c1d1bc2d444c5186a73ab5802a0b4"
+    accountType = "ecdsa"
+
+[tx]
+    # if it is use for hyperchain, please use 1.0 to replace default
+    # if use for flato, please use 2.0 to replace default
+    version = "2.4"
+
+

@@ -1,0 +1,55 @@
+{
+  "name": "gosdk",
+  "version": "1.3.1-2",
+  "description": "gosdk",
+  "main": "index.js",
+  "scripts": {
+    "test": "go test ./...",
+    "release": "standard-version"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git.hyperchain.cn/hyperchain/gosdk"
+  },
+  "keywords": [
+    "go",
+    "sdk"
+  ],
+  "author": "Hyperchain Authors",
+  "license": "",
+  "devDependencies": {
+    "cz-conventional-changelog": "^2.1.0",
+    "ghooks": "^2.0.2",
+    "standard-version": "^4.3.0",
+    "validate-commit-msg-smart": "^1.1.2"
+  },
+  "config": {
+    "commitizen": {
+      "path": "./node_modules/cz-conventional-changelog"
+    },
+    "ghooks": {
+      "commit-msg": "validate-commit-msg",
+      "pre-commit": "./.githooks/pre-commit"
+    },
+    "validate-commit-msg": {
+      "types": [
+        "feat",
+        "fix",
+        "docs",
+        "style",
+        "refactor",
+        "perf",
+        "test",
+        "chore",
+        "revert",
+        "regexp jira\\-\\d+",
+        "regexp jira\\-\\d+\\s?[feat|fix|docs|style|refactor|perf|test|chore|revert]"
+      ],
+      "warnOnFail": false,
+      "maxSubjectLength": 100,
+      "subjectPattern": ".+",
+      "subjectPatternErrorMsg": "subject does not match subject pattern, you should use one of [feat|fix|docs|style|refactor|perf|test|chore|revert]",
+      "helpMessage": ""
+    }
+  }
+}

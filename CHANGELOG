@@ -1,0 +1,66 @@
+release v0.1.1  add CI and hooks
+                add go lint
+                add send transaction interface
+                add interface of transaction, node, contract function
+                format log print
+
+release v0.2.1  add interface about contract, archive, webSocket
+                uniform use of Address and Hash
+
+release v1.0.0  complete initial version
+release v1.0.1  add tcert
+                add util of Solidity compile local
+                fix bindNode out of range and unmarshal error when simulate is true
+                when use CFCA, tcert should be replaced with sdkCert and sign with sdkCert
+release v1.0.2  add MQ interface
+                update interface of node to 1.4 include delNode is replaced with deleteVP and deleteNVP
+                fix get transaction receipt error can't return
+release v1.1.0  change signature to hyperchain 1.4
+release v1.2.0  change signature to hyperchain 1.6
+release v1.2.1  fix blockNum can not use `latest`
+                fix MQ interface can't unmarshal result
+release v1.2.2  add archive interface to support hyperchain 1.6
+                add getGenesisBlock and getChainHeight interface
+                add abi test
+release v1.2.3  fix sm2 account public key generate
+release v1.2.4  add DefaultRPC method
+                add radar related api named ListenContract
+                add unpack input by abi
+release v1.2.5 add get hex public key from account key
+               add interface GetBatchReceiptList and GetBatchTxByHashList
+               add fetch func outputs types by abi and func name
+               add invoke contract func by go basic type
+release v1.2.6 add transaction interface to set nonce, timestamp and signature
+               change sm crypto to golang realization
+release v1.2.7 add some interfaces
+release v1.2.8 refactor refactor cgo secp256k1 to golang
+               fix sm2 hex of public key may has not enough length
+release v1.2.9 add account privateKey crypto type
+               add 3des accounts
+               add private transaction
+release v1.2.10 add account compatibility test
+                refactor init log
+                add implement ecdsa with clang
+release v1.2.11 add hvm interface
+release v1.2.12 add go type to java type support
+release v1.2.13 add deploy contract with string args
+release v1.2.14 add go type support to encodepayload
+                add custom logger backend support
+release v1.2.15 fix mq params number
+                add hvm mq support and fix mq client listener
+                add hvm visualization and classfile parse interface
+release v1.2.16 add int and uint type elements for solidity
+                support method and event overload
+                fix reConnection time and hvm abi
+release v1.2.17 remove address param when address is empty
+
+release v1.3.0 add txVersion to sign signature
+release v1.3.1 add file upload and download
+               add txHash calculate local
+               fix account compatibility
+               add roles, config interface
+               add pki account support
+               fix tcert when plaftom is flato
+release v1.3.2 modify txHash calculation
+               modify error code to make simulate transaction available in 1.0 and 2.x
+               add auth api for inspector in rpc

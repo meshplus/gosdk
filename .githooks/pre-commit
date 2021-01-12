@@ -1,0 +1,50 @@
+#!/bin/sh
+cd $GOPATH/src/github.com/meshplus/gosdk
+
+# st=0
+# counter=0
+# echo "1. golint.."
+# for pkg in $(go list ./... | grep -v /vendor/); do
+#     # echo "golint ==> $pkg:"
+#     # golint  "$pkg"
+#     if [ $pkg = "github.com/meshplus/gosdk/rpc" ]; then
+#         rest=`golint "$pkg"`
+#         if [[ ! -z $rest ]]; then
+#           st=1;
+#           echo "$rest"
+#           counter=$((counter+1)) ;
+#           if [[ $counter -gt 10 ]]; then
+#              # exit 1;
+#              echo "too many golint error..."
+#              break;
+#           fi
+#         fi
+#     fi
+# done
+# [ $st -ne 0 ] && exit 1
+
+echo "1. gofmt.."
+find . -path '*/vendor/*' -prune -o -name '*.go' -type f -exec gofmt -s -w {} \;
+[ $? -ne 0 ] && exit 1
+
+echo "2. govet check.."
+
+# go list ./... | grep -v vendor | xargs go vet -v
+st=0
+counter=0
+for pkg in $(go list ./... | grep -v /vendor/); do
+    echo  "go vet -v $pkg"
+    rest=`go vet -v "$pkg" | grep -v Checking`
+    if [[ ! -z $rest ]]; then
+      st=1;
+      echo "[$counter]: $rest"
+      counter=$((counter+1)) ;
+      if [[ $counter -gt 10 ]]; then
+         # exit 1;
+         echo "too many govet error..."
+         break;
+      fi
+    fi
+done
+
+exit $st
