@@ -14,7 +14,7 @@ require (
 	github.com/kr/pretty v0.1.0 // indirect
 	github.com/magiconair/properties v1.8.0
 	github.com/meshplus/crypto-gm v0.1.0
-	github.com/meshplus/crypto-standard v0.1.0
+	github.com/meshplus/crypto-standard v0.1.1
 	github.com/meshplus/flato-msp-cert v0.1.0
 	github.com/mholt/archiver v0.0.0-20180417220235-e4ef56d48eb0
 	github.com/mitchellh/mapstructure v1.2.2
