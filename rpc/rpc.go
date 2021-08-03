@@ -2167,7 +2167,26 @@ func (rpc *RPC) Archive(filterID string, sync bool) (bool, StdError) {
 	return result, nil
 }
 
+// ArchiveNoPredict used for archive to specific committed block-number
+func (rpc *RPC) ArchiveNoPredict(filterID string) (string, StdError) {
+	method := ARCHIVE + "archiveNoPredict"
+
+	data, stdErr := rpc.call(method, filterID)
+	if stdErr != nil {
+		return "", stdErr
+	}
+
+	var result string
+
+	if sysErr := json.Unmarshal(data, &result); sysErr != nil {
+		return "", NewSystemError(sysErr)
+	}
+
+	return result, nil
+}
+
 // Restore restores datas that have been archived for given snapshot. If successful, returns true.
+// Deprecated: we will remove it later, use ipc command [restore <namespace> <filterId> <shouldSync>] instead.
 func (rpc *RPC) Restore(filterID string, sync bool) (bool, StdError) {
 	method := ARCHIVE + "restore"
 
@@ -2214,6 +2233,24 @@ func (rpc *RPC) QueryArchiveExist(filterID string) (bool, StdError) {
 
 	if sysErr := json.Unmarshal(data, &result); sysErr != nil {
 		return false, NewSystemError(sysErr)
+	}
+
+	return result, nil
+}
+
+// QueryArchive query archive status with the give snapshot.
+func (rpc *RPC) QueryArchive(filterID string) (string, StdError) {
+	method := ARCHIVE + "queryArchive"
+
+	data, stdErr := rpc.call(method, filterID)
+	if stdErr != nil {
+		return "", stdErr
+	}
+
+	var result string
+
+	if sysErr := json.Unmarshal(data, &result); sysErr != nil {
+		return "", NewSystemError(sysErr)
 	}
 
 	return result, nil
@@ -2296,7 +2333,7 @@ func (rpc *RPC) GetAccountsByRole(role string) ([]string, StdError) {
 	return accounts, nil
 }
 
-// GetContractStatus 获取合约状态
+// GetAccountStatus 获取用户状态
 func (rpc *RPC) GetAccountStatus(address string) (string, StdError) {
 	method := ACCOUNT + "getStatus"
 	param := address

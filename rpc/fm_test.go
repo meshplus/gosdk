@@ -454,3 +454,29 @@ func makeBigFile(name string, size int) error {
 	}
 	return nil
 }
+
+func TestRPC_FilePush(t *testing.T) {
+	t.Skip("")
+	file, err := os.Open("filePath")
+	if err != nil {
+		t.Error(err)
+	}
+	hash, err := GetFileHash(file)
+	if err != nil {
+		t.Error(err)
+	}
+	_, err = rpc.FilePush(hash, []int{1, 2, 3}, accountJson, password, 1)
+	assert.Nil(t, err)
+}
+
+func TestRPC_FileDownloadWithAccount(t *testing.T) {
+	t.Skip("file system not start")
+	createDirAndSetVersion(t, dirPath)
+	// 文件hash需要使用在本地上传文件返回的hash
+	hash := "a82d233bc0890ddd52d871ebfc8cbaf0"
+	addr := fmKey.GetAddress()
+	downloadPath, err := rpc.FileDownloadWithAccount(dirPath, hash, addr.String(), 3, accountJson, password)
+	assert.Nil(t, err)
+	t.Log(downloadPath)
+	deleteDir(t, dirPath)
+}
