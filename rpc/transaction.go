@@ -95,6 +95,7 @@ type Transaction struct {
 	// private transaction related
 	participants []string
 	isPrivateTx  bool
+	optionExtra  string
 }
 
 func GetTxVersionInt(txVersionStr string) TxVersionInt {
@@ -399,6 +400,11 @@ func (t *Transaction) getTxVersion() string {
 	return t.txVersion
 }
 
+// SetOptionExtra  set transaction option extra
+func (t *Transaction) SetOptionExtra(option string) {
+	t.optionExtra = option
+}
+
 // needHashString construct a stirng that need to hash
 func needHashString(t *Transaction) string {
 	p := getProcessor()
@@ -631,6 +637,9 @@ func (t *Transaction) Serialize() interface{} {
 	}
 	if t.cName != "" {
 		param["cName"] = t.cName
+	}
+	if t.optionExtra != "" {
+		param["optionExtra"] = t.optionExtra
 	}
 	return param
 }

@@ -15,11 +15,13 @@ import (
 )
 
 const (
-	// FileDownload Type
+	// TypeDownload FileDownload
 	TypeDownload = "download"
-	// FileUpload Type
+	// TypeUpload FileUpload
 	TypeUpload = "upload"
-	// content type stream
+	// TypePush FilePush
+	TypePush = "push"
+	// Stream content type stream
 	Stream = "application/octet-stream"
 )
 
@@ -61,10 +63,10 @@ func (rpc *RPC) FileUpload(filePath string, description string, whiteList []comm
 		return "", cerr
 	}
 	file, err := os.Open(filePath)
-	defer file.Close()
 	if err != nil {
 		return "", NewSystemError(err)
 	}
+	defer file.Close()
 
 	// build fileExtra
 	nodeHash, gerr := rpc.GetNodeHashByID(nodeID)
@@ -105,7 +107,7 @@ func (rpc *RPC) FileUpload(filePath string, description string, whiteList []comm
 		return "", NewSystemError(serr)
 	}
 
-	method := FILE + "upload"
+	method := FILE + TypeUpload
 	extraHeaders := make(map[string]string)
 	extraHeaders["type"] = TypeUpload
 
@@ -123,6 +125,7 @@ func (rpc *RPC) FileUpload(filePath string, description string, whiteList []comm
 }
 
 // FileDownload 文件下载接口,tarPath有两种使用：1.传有效目录，会在给路径下以hash作为文件名保存文件；2.传有效文件路径,对该文件进行断点续传
+// Deprecated: will be deleted, use FileDownloadWithAccount instead
 func (rpc *RPC) FileDownload(fileDownloadTX *Transaction, tarPath string, hash string, nodeID int) (string, StdError) {
 	tarPath, aerr := filepath.Abs(tarPath)
 	if aerr != nil {
@@ -181,17 +184,114 @@ func (rpc *RPC) FileDownload(fileDownloadTX *Transaction, tarPath string, hash s
 		err := syscall.Flock(int(file.Fd()), syscall.LOCK_UN)
 		if err != nil {
 			logger.Warningf("file %s release lock failed", file.Name())
-			fmt.Println("eee")
-			fmt.Println(err)
 		}
 		_ = file.Close()
 	}()
 
-	method := FILE + "download"
+	method := FILE + TypeDownload
 
 	extraHeaders := make(map[string]string)
 	extraHeaders["pos"] = strconv.FormatInt(pos, 10)
 	extraHeaders["type"] = TypeDownload
+
+	_, cerr := rpc.callFM(method, nodeID, DOWNLOAD, extraHeaders, file, fileDownloadTX.Serialize())
+	if cerr != nil {
+		if info.IsDir() {
+			stat, serr := file.Stat()
+			if serr == nil && stat.Size() == 0 {
+				logger.Debugf("File download failed, try to delete empty file %s.", file.Name())
+				rerr := os.Remove(file.Name())
+				if rerr != nil {
+					logger.Warning("delete empty file failed.")
+				}
+			}
+		}
+		return "", cerr
+	}
+
+	return downloadPath, nil
+}
+
+// FileDownloadWithAccount 文件下载接口,tarPath有两种使用：1.传有效目录，会在给路径下以hash作为文件名保存文件；2.传有效文件路径,对该文件进行断点续传
+func (rpc *RPC) FileDownloadWithAccount(tarPath, hash, owner string, nodeID int, accountJson string, password string) (string, StdError) {
+	tarPath, aerr := filepath.Abs(tarPath)
+	if aerr != nil {
+		return "", NewSystemError(aerr)
+	}
+	info, serr := os.Stat(tarPath)
+	if serr != nil {
+		return "", NewSystemError(serr)
+	}
+	if hash == "" {
+		return "", NewSystemError(errors.New("hash is empty"))
+	}
+
+	var downloadPath string
+	var pos int64
+	var file *os.File
+	var oerr error
+	if info.IsDir() {
+		downloadPath = filepath.Join(tarPath, hash)
+		suffix := 0
+		for {
+			_, tserr := os.Stat(downloadPath)
+			if tserr != nil {
+				if os.IsNotExist(tserr) {
+					file, oerr = os.OpenFile(downloadPath, os.O_CREATE|os.O_RDWR, 0644)
+					if oerr != nil {
+						return "", NewSystemError(oerr)
+					}
+					lerr := syscall.Flock(int(file.Fd()), syscall.LOCK_EX|syscall.LOCK_NB)
+					if lerr == nil {
+						break
+					} else {
+						_ = file.Close()
+					}
+				} else {
+					return "", NewSystemError(tserr)
+				}
+			}
+			suffix++
+			downloadPath = fmt.Sprintf("%s(%s)", filepath.Join(tarPath, hash), strconv.Itoa(suffix))
+		}
+	} else {
+		downloadPath = tarPath
+		pos = info.Size()
+		file, oerr = os.OpenFile(downloadPath, os.O_RDWR, 0644)
+		if oerr != nil {
+			return "", NewSystemError(oerr)
+		}
+		lerr := syscall.Flock(int(file.Fd()), syscall.LOCK_EX|syscall.LOCK_NB)
+		if lerr != nil {
+			return "", NewSystemError(lerr)
+		}
+	}
+
+	defer func() {
+		err := syscall.Flock(int(file.Fd()), syscall.LOCK_UN)
+		if err != nil {
+			logger.Warningf("file %s release lock failed", file.Name())
+		}
+		_ = file.Close()
+	}()
+
+	method := FILE + TypeDownload
+
+	extraHeaders := make(map[string]string)
+	extraHeaders["pos"] = strconv.FormatInt(pos, 10)
+	extraHeaders["type"] = TypeDownload
+
+	key, kerr := account.GenKeyFromAccountJson(accountJson, password)
+	if kerr != nil {
+		return "", NewSystemError(kerr)
+	}
+
+	from := key.(account.Key).GetAddress().Hex()
+
+	fileDownloadTX := NewTransaction(from).To(owner).Value(0)
+	fileDownloadTX.txVersion = rpc.txVersion
+	fileDownloadTX.SetExtraIDString(hash)
+	fileDownloadTX.Sign(key)
 
 	_, cerr := rpc.callFM(method, nodeID, DOWNLOAD, extraHeaders, file, fileDownloadTX.Serialize())
 	if cerr != nil {
@@ -219,6 +319,53 @@ func (rpc *RPC) FileUpdate(fileUpdateTX *Transaction) StdError {
 		return err
 	}
 	return nil
+}
+
+// FilePush 文件推送接口
+func (rpc *RPC) FilePush(hash string, pushNodes []int, accountJson, password string, nodeID int) (string, StdError) {
+	method := FILE + TypePush
+
+	extraHeaders := make(map[string]string)
+	extraHeaders["type"] = TypePush
+
+	var optionExtra string
+	for i, nodeID := range pushNodes {
+		nodeHash, gerr := rpc.GetNodeHashByID(nodeID)
+		if gerr != nil {
+			return "", gerr
+		}
+		optionExtra += nodeHash
+		if i != len(pushNodes)-1 {
+			optionExtra += ","
+		}
+	}
+
+	key, kerr := account.GenKeyFromAccountJson(accountJson, password)
+	if kerr != nil {
+		return "", NewSystemError(kerr)
+	}
+
+	from := key.(account.Key).GetAddress().Hex()
+
+	filePushTX := NewTransaction(from).To(from).Value(0)
+	filePushTX.txVersion = rpc.txVersion
+	filePushTX.SetExtraIDString(hash)
+	filePushTX.Sign(key)
+
+	result, cerr := rpc.callFM(method, nodeID, GENERAL, extraHeaders, nil, filePushTX.Serialize())
+	if cerr != nil {
+		return "", cerr
+	}
+	if result == nil {
+		return "", nil
+	}
+	var strResult string
+	uerr := json.Unmarshal(result, &strResult)
+	if uerr != nil {
+		return "", NewSystemError(uerr)
+	}
+
+	return strResult, nil
 }
 
 // GetFileExtraByExtraId 通过extraId获取文件信息FileExtra

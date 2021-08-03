@@ -35,11 +35,16 @@ newAddress := pubKey.GetAddress()
 Declare the bin and ABI of the contract, and create the contract deploy transaction
 
 ```go
-// contract BIN declare
-contractBIN := ""
 // contract ABI declare
-contractABI := ``
-transaction = NewTransaction(common.BytesToAddress(newAddress).Hex()).Deploy(bin)
+abiContract := ""
+// contract BIN declare
+binContract := ``
+// contract 
+pubKey, _ := guomiKey.Public().(*gm.SM2PublicKey).Bytes()
+h, _ := hash.NewHasher(hash.KECCAK_256).Hash(pubKey)
+newAddress := h[12:]
+
+transaction := NewTransaction(common.BytesToAddress(newAddress).Hex()).Deploy(binContract).DeployArgs(abiContract)
 //sign with the private key of the account created before
 transaction.Sign(guomiKey)
 ```
@@ -50,10 +55,9 @@ Use rpc client send contract deploy transaction and get contract address from tx
 
 ```go
 txReceipt, err := rpc.DeployContract(transaction)
-	if err != nil {
-		fmt.Println(err)
-	}
-	fmt.Println(txReceipt.ContractAddress)
+if err != nil {
+	fmt.Println(err)
+}
 //Assignment contract address
 contractAddress := txReceipt.ContractAddress
 ```
