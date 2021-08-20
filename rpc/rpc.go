@@ -660,9 +660,9 @@ func (rpc *RPC) GetLatestBlock() (*Block, StdError) {
 	return block, nil
 }
 
-// Deprecated
 // GetBlocks returns a list of blocks from start block number to end block number
 // isPlain indicates if the result includes transaction information. if false, includes, otherwise not.
+// Deprecated use GetBlocksWithLimit instead
 func (rpc *RPC) GetBlocks(from, to uint64, isPlain bool) ([]*Block, StdError) {
 	if from == 0 || to == 0 || to < from {
 		return nil, NewSystemError(errors.New("to and from should be non-zero integer and to should no more than from"))
@@ -752,6 +752,7 @@ func (rpc *RPC) GetBlockByHash(blockHash string, isPlain bool) (*Block, StdError
 }
 
 // GetBatchBlocksByHash returns a list of blocks by a list of specific block hash.
+// Deprecated
 func (rpc *RPC) GetBatchBlocksByHash(blockHashes []string, isPlain bool) ([]*Block, StdError) {
 	method := BLOCK + "getBatchBlocksByHash"
 
@@ -812,6 +813,7 @@ func (rpc *RPC) GetBlockByNumber(blockNum interface{}, isPlain bool) (*Block, St
 }
 
 // GetBatchBlocksByNumber returns a list of blocks by a list of specific block number.
+// Deprecated
 func (rpc *RPC) GetBatchBlocksByNumber(blockNums []uint64, isPlain bool) ([]*Block, StdError) {
 	method := BLOCK + "getBatchBlocksByNumber"
 
@@ -878,6 +880,7 @@ func (rpc *RPC) GetAvgGenTimeByBlockNum(from, to uint64) (int64, StdError) {
 // GetBlocksByTime returns the number of blocks, starting block and ending block
 // at specific time periods.
 // startTime and endTime are timestamps
+// Deprecated
 func (rpc *RPC) GetBlocksByTime(startTime, endTime uint64) (*BlockInterval, StdError) {
 	if endTime < startTime {
 		return nil, NewSystemError(errors.New("startTime should less than endTime"))
@@ -1042,6 +1045,7 @@ func (rpc *RPC) GetTransactionsByBlkNumWithLimit(start, end uint64, metadata *Me
 }
 
 // GetDiscardTx 获取所有非法交易
+// Deprecated
 func (rpc *RPC) GetDiscardTx() ([]TransactionInfo, StdError) {
 	method := TRANSACTION + "getDiscardTransactions"
 	data, err := rpc.call(method)
@@ -1082,6 +1086,8 @@ func (rpc *RPC) GetTransactionByHash(txHash string) (*TransactionInfo, StdError)
 	return tx.ToTransaction()
 }
 
+// GetPrivateTransactionByHash
+// Deprecated
 func (rpc *RPC) GetPrivateTransactionByHash(txHash string) (*TransactionInfo, StdError) {
 	method := TRANSACTION + "getPrivateTransactionByHash"
 	param := txHash
@@ -1098,6 +1104,7 @@ func (rpc *RPC) GetPrivateTransactionByHash(txHash string) (*TransactionInfo, St
 }
 
 // GetBatchTxByHash 批量获取交易
+// Deprecated
 func (rpc *RPC) GetBatchTxByHash(hashes []string) ([]TransactionInfo, StdError) {
 	mp := newMapParam("hashes", hashes)
 	method := TRANSACTION + "getBatchTransactions"
@@ -1175,6 +1182,7 @@ func (rpc *RPC) GetTxAvgTimeByBlockNumber(from, to uint64) (uint64, StdError) {
 }
 
 // GetBatchReceipt 批量获取回执
+// Deprecated
 func (rpc *RPC) GetBatchReceipt(hashes []string) ([]TxReceipt, StdError) {
 	mp := newMapParam("hashes", hashes)
 	method := TRANSACTION + "getBatchReceipt"
@@ -1192,6 +1200,7 @@ func (rpc *RPC) GetBatchReceipt(hashes []string) ([]TxReceipt, StdError) {
 }
 
 // GetTransactionsCountByTime 查询指定时间区间内的交易数量
+// Deprecated
 func (rpc *RPC) GetTransactionsCountByTime(startTime, endTime uint64) (uint64, StdError) {
 	mp := newMapParam("startTime", startTime).addKV("endTime", endTime)
 	method := TRANSACTION + "getTransactionsCountByTime"
@@ -1288,6 +1297,7 @@ func (rpc *RPC) GetTxCount() (*TransactionsCount, StdError) {
 }
 
 // GetTxCountByContractAddr 查询区块间指定合约的交易量 txExtra过滤是否带有额外字段
+// Deprecated
 func (rpc *RPC) GetTxCountByContractAddr(from, to uint64, address string, txExtra bool) (*TransactionsCountByContract, StdError) {
 	mp := newMapParam("from", from).addKV("to", to).addKV("address", address).addKV("txExtra", txExtra)
 	method := TRANSACTION + "getTransactionsCountByContractAddr"
@@ -1330,6 +1340,7 @@ func (rpc *RPC) GetTxCountByContractName(from, to uint64, name string, txExtra b
 }
 
 // GetTransactionsCountByMethodID 查询区块区间交易数量（by method ID）
+// Deprecated
 func (rpc *RPC) GetTransactionsCountByMethodID(from, to uint64, address string, methodID string) (*TransactionsCountByContract, StdError) {
 	mp := newMapParam("from", from).addKV("to", to).addKV("address", address).addKV("methodID", methodID)
 	method := TRANSACTION + "getTransactionsCountByMethodID"
@@ -1459,6 +1470,7 @@ func (rpc *RPC) getTxByTimeWithLimit(param interface{}) (*PageTxs, StdError) {
 }
 
 // GetDiscardTransactionsByTime 查询指定时间区间内的非法交易
+// Deprecated
 func (rpc *RPC) GetDiscardTransactionsByTime(start, end uint64) ([]TransactionInfo, StdError) {
 	mp := newMapParam("startTime", start).addKV("endTime", end)
 	method := TRANSACTION + "getDiscardTransactionsByTime"
@@ -1485,6 +1497,7 @@ func (rpc *RPC) GetDiscardTransactionsByTime(start, end uint64) ([]TransactionIn
 }
 
 // GetNextPageTxs 获取下一页的交易
+// Deprecated
 func (rpc *RPC) GetNextPageTxs(blkNumber, txIndex, minBlkNumber, maxBlkNumber, separated, pageSize uint64, containCurrent bool, contractAddr string) ([]TransactionInfo, StdError) {
 	method := TRANSACTION + "getNextPageTransactions"
 	param := &TransactionPageArg{
@@ -1517,6 +1530,7 @@ func (rpc *RPC) GetNextPageTxsByName(blkNumber, txIndex, minBlkNumber, maxBlkNum
 }
 
 // GetPrevPageTxs 获取上一页的交易
+// Deprecated
 func (rpc *RPC) GetPrevPageTxs(blkNumber, txIndex, minBlkNumber, maxBlkNumber, separated, pageSize uint64, containCurrent bool, contractAddr string) ([]TransactionInfo, StdError) {
 	method := TRANSACTION + "getPrevPageTransactions"
 	param := &TransactionPageArg{
@@ -1572,6 +1586,7 @@ func (rpc *RPC) getPageTxs(method string, param *TransactionPageArg) ([]Transact
 
 // GetTxReceipt 通过交易hash获取交易回执
 // 参数txHash应该是"0x...."的形式
+// Deprecated
 func (rpc *RPC) GetTxReceipt(txHash string, isPrivateTx bool) (*TxReceipt, StdError) {
 	var method string
 	txHash = chPrefix(txHash)
@@ -1639,6 +1654,7 @@ func isTxVersion10(txVersion string) bool {
 }
 
 // DeployContract Deploy contract rpc
+// Deprecated
 func (rpc *RPC) DeployContract(transaction *Transaction) (*TxReceipt, StdError) {
 	var method string
 	if transaction.isPrivateTx {
@@ -1673,6 +1689,7 @@ func (rpc *RPC) DeployContractAsync(transaction *Transaction, handler AsyncHandl
 }
 
 // InvokeContract invoke contract rpc
+// Deprecated
 func (rpc *RPC) InvokeContract(transaction *Transaction) (*TxReceipt, StdError) {
 	var method string
 	if transaction.isPrivateTx {
@@ -2347,6 +2364,8 @@ func (rpc *RPC) GetAccountStatus(address string) (string, StdError) {
 
 /*---------------------------------- radar ----------------------------------*/
 
+// ListenContract
+// Deprecated
 func (rpc *RPC) ListenContract(srcCode, addr string) (string, StdError) {
 	method := RADAR + "registerContract"
 	param := newMapParam("source", srcCode)
