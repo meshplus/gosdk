@@ -1,0 +1,40 @@
+syntax = "proto3";
+
+package protos;
+
+message ProposalData{
+    enum Status {
+        CREATE = 0;
+        VOTING = 1;
+        REJECT = 2;
+        WAITING_EXE = 3;
+        CANCEL = 4;
+        COMPLETED = 5;
+        TIMEOUT = 6;
+    }
+
+    enum PType{
+        CONFIG = 0;
+        PERMISSION = 1;
+        NODE = 2;
+    }
+    uint64  id = 1;
+    bytes  code = 2;
+    int64 timestamp = 3;
+    int64 timeout = 4;
+    Status status = 5;
+    repeated VoteInfo assentor = 6;
+    repeated VoteInfo objector = 7;
+    uint32 threshold = 8;
+    uint32 score = 9;
+    string creator = 10;
+    string version = 11;
+    PType type = 12;
+    bytes completed = 13;
+    bytes cancel = 14;
+}
+
+message VoteInfo {
+    string addr = 1;
+    string txHash = 2;
+}

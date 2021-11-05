@@ -1,0 +1,12 @@
+package bvm
+
+import (
+	"testing"
+)
+
+func TestDecoder(t *testing.T) {
+	retStr := `0x7b2253756363657373223a747275652c22526574223a22573373695932396b5a5349364d6a417766537837496d4e765a4755694f6a49774d48307365794a6a6232526c496a6f794d4442394c4873695932396b5a5349364d6a41776656303d222c22457272223a22227d`
+	// {"Success":true, "Ret":[{"code":200},{"code":200},{"code":200},{"code":200}], "Err":}
+	res := Decode(retStr)
+	t.Log(res)
+}

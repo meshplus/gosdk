@@ -1,0 +1,10 @@
+.idea/
+.vscode/
+.DS_Store
+*.iml
+node_modules/
+logs/
+account/*.txt
+**/*.log
+go.sum
+package-lock.json
