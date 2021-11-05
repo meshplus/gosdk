@@ -16,10 +16,10 @@ jobs:
       #        run: curl -sfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh| sh -s -- -b . v1.16.0
       #      - name: Lint
       #        run: ./golangci-lint run --fix
-      - name: Run Golangci-lint
-        uses: golangci/golangci-lint-action@v2
-        with:
-          version: v1.34.1
+#      - name: Run Golangci-lint
+#        uses: golangci/golangci-lint-action@v2
+#        with:
+#          version: v1.34.1
   test:
     name: Unit Testing
     runs-on: ubuntu-18.04
