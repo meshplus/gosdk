@@ -20,7 +20,7 @@ const (
 	// MQException MQException
 	MQException routingKey = "MQException"
 	// MQHvm
-	MQHvm routingKey = "MQHvm"
+	//MQHvm routingKey = "MQHvm"
 )
 
 // RegisterMeta mq register
@@ -38,6 +38,7 @@ type RegisterMeta struct {
 	ToBlock   string           `json:"toBlock,omitempty"`
 	Addresses []common.Address `json:"addresses,omitempty"`
 	Topics    [][]common.Hash  `json:"topics,omitempty"`
+	Delay     bool             `json:"delay"`
 	// exception criteria
 	//Modules        []string `json:"modules,omitempty"`
 	//ModulesExclude []string `json:"modules_exclude,omitempty"`
@@ -90,6 +91,12 @@ func (rm *RegisterMeta) SetTopics(pos int, topics ...common.Hash) *RegisterMeta 
 		fmt.Println(fmt.Errorf("you can only set 4 topics at most"))
 	}
 	rm.Topics = append(rm.Topics, topics)
+	return rm
+}
+
+// SetDelay set delay
+func (rm *RegisterMeta) SetDelay(delay bool) *RegisterMeta {
+	rm.Delay = delay
 	return rm
 }
 
@@ -150,6 +157,7 @@ func concatNeedHash(rm *RegisterMeta) string {
 	result.WriteString(":toBlock=" + rm.ToBlock)
 	result.WriteString(":addresses=" + arrayToString(rm.Addresses))
 	result.WriteString(":topics=" + arrayToString(rm.Topics))
+	result.WriteString(":delay=" + strconv.FormatBool(rm.Delay))
 	//result.WriteString(":modules=" + arrayToString(rm.Modules))
 	//result.WriteString(":modulesExclude=" + arrayToString(rm.ModulesExclude))
 	//result.WriteString(":subType=" + arrayToString(rm.SubType))

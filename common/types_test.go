@@ -57,25 +57,6 @@ func TestIsHexAddress(t *testing.T) {
 	}
 }
 
-func TestAddressHexChecksum(t *testing.T) {
-	from := "0x000f1a7a08ccc48e5d30f80850cf1cf283aa3abd"
-	out := IsHexAddress(from)
-	if !out {
-		t.Error("it is an address")
-	}
-
-	from1 := "12m,dg"
-
-	if out1 := IsHexAddress(from1); out1 {
-		t.Error("it is not an address representation")
-	}
-
-	from2 := "000f1a7a08ccc48e5d30f80850cf1cf283aa3abd"
-	if out2 := IsHexAddress(from2); !out2 {
-		t.Error("it is an address")
-	}
-}
-
 func BenchmarkAddressHex(b *testing.B) {
 	testAddr := HexToAddress("0x5aaeb6053f3e94c9b9a09f33669435e7ef1beaed")
 	for n := 0; n < b.N; n++ {

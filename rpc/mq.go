@@ -44,7 +44,7 @@ type MqClient struct {
 func (mc *MqClient) Register(id uint, meta *RegisterMeta) (*QueueRegister, StdError) {
 	method := MQ + "register"
 	url := mc.hrm.nodes[id-1].url
-	data, err := mc.call(method, url, meta)
+	data, err := mc.call(int(id), method, url, meta)
 	if err != nil {
 		return nil, err
 	}
@@ -61,7 +61,7 @@ func (mc *MqClient) Register(id uint, meta *RegisterMeta) (*QueueRegister, StdEr
 func (mc *MqClient) UnRegister(id uint, meta *UnRegisterMeta) (*QueueUnRegister, StdError) {
 	method := MQ + "unRegister"
 	url := mc.hrm.nodes[id-1].url
-	data, err := mc.call(method, url, meta.QueueName, meta.ExchangeName, meta.From, meta.Signature)
+	data, err := mc.call(int(id), method, url, meta.QueueName, meta.ExchangeName, meta.From, meta.Signature)
 	if err != nil {
 		return nil, err
 	}
@@ -77,7 +77,7 @@ func (mc *MqClient) UnRegister(id uint, meta *UnRegisterMeta) (*QueueUnRegister,
 func (mc *MqClient) GetAllQueueNames(id uint) ([]string, StdError) {
 	method := MQ + "getAllQueueNames"
 	url := mc.hrm.nodes[id-1].url
-	data, err := mc.call(method, url)
+	data, err := mc.call(int(id), method, url)
 	if err != nil {
 		return nil, err
 	}
@@ -93,7 +93,7 @@ func (mc *MqClient) GetAllQueueNames(id uint) ([]string, StdError) {
 func (mc *MqClient) InformNormal(id uint, brokerURL string) (bool, StdError) {
 	method := MQ + "informNormal"
 	url := mc.hrm.nodes[id-1].url
-	data, err := mc.call(method, url, brokerURL)
+	data, err := mc.call(int(id), method, url, brokerURL)
 	if err != nil {
 		return false, err
 	}
@@ -115,7 +115,7 @@ func (mc *MqClient) InformNormal(id uint, brokerURL string) (bool, StdError) {
 func (mc *MqClient) GetExchangerName(id uint) (string, StdError) {
 	method := MQ + "getExchangerName"
 	url := mc.hrm.nodes[id-1].url
-	data, err := mc.call(method, url)
+	data, err := mc.call(int(id), method, url)
 	if err != nil {
 		return "", err
 	}
@@ -131,9 +131,9 @@ func (mc *MqClient) GetExchangerName(id uint) (string, StdError) {
 func (mc *MqClient) DeleteExchange(id uint, exchange string) (bool, StdError) {
 	method := MQ + "deleteExchanger"
 	url := mc.hrm.nodes[id-1].url
-	data, err := mc.call(method, url, exchange)
+	data, err := mc.call(int(id), method, url, exchange)
 	if err != nil {
-		return false, nil
+		return false, err
 	}
 
 	notice := struct {
@@ -199,11 +199,11 @@ func getMqChannel(url string) (*amqp.Channel, error) {
 }
 
 // call http call
-func (mc *MqClient) call(method string, url string, params ...interface{}) (json.RawMessage, StdError) {
+func (mc *MqClient) call(id int, method string, url string, params ...interface{}) (json.RawMessage, StdError) {
 	req := &JSONRequest{
 		Method:    method,
 		Version:   JSONRPCVersion,
-		ID:        1,
+		ID:        id,
 		Namespace: mc.hrm.namespace,
 		Params:    params,
 	}

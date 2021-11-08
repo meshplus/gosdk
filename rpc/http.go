@@ -66,10 +66,11 @@ type httpRequestManager struct {
 	isHTTP     bool
 	tcm        *TCertManager
 	reConnTime int64
+	txVersion  string
 }
 
 // newHTTPRequestManager is used to construct httpRequestManager
-func newHTTPRequestManager(vip *viper.Viper, confRootPath string) (hrm *httpRequestManager) {
+func newHTTPRequestManager(vip *viper.Viper, confRootPath string, txVersion string) (hrm *httpRequestManager) {
 	var (
 		namespace string
 		urls      []string
@@ -115,16 +116,16 @@ func newHTTPRequestManager(vip *viper.Viper, confRootPath string) (hrm *httpRequ
 		tcm:        tcm,
 		isHTTP:     isHTTPS,
 		reConnTime: reConnTime,
+		txVersion:  txVersion,
 	}
 
-	if sendTcert && !vip.GetBool(common.PrivacyCfca) && !isFlato() {
+	if sendTcert && !vip.GetBool(common.PrivacyCfca) && !isFlato(txVersion) {
 		tcm.tcertPool = make(map[string]TCert)
 		for _, node := range nodes {
 			tcert, err := httpRequestManager.getTCert(node.url)
 			if err != nil {
 				// if getTCert's method is not exist, means platform is flato
 				if err.Code() == MethodNotExistOrInvalidCode {
-					TxVersion = "2.0"
 					return
 				}
 				logger.Error("can not get tcert from ", node.url, err)
@@ -231,6 +232,7 @@ func (hrm *httpRequestManager) SyncRequestSpecificURL(body []byte, url string, r
 			return nil, stdErr
 		}
 		addHeaders(req, extraHeaders)
+		req.Header.Add("content-type", "application/octet-stream")
 	case UPLOAD:
 		var err error
 		req, err = http.NewRequest("POST", url, rwSeeker)
@@ -238,6 +240,7 @@ func (hrm *httpRequestManager) SyncRequestSpecificURL(body []byte, url string, r
 			return nil, NewSystemError(err)
 		}
 		addHeaders(req, extraHeaders)
+		req.Header.Add("content-type", "application/octet-stream")
 	case GENERAL:
 		fallthrough
 	default:
@@ -248,7 +251,7 @@ func (hrm *httpRequestManager) SyncRequestSpecificURL(body []byte, url string, r
 	}
 
 	if hrm.sendTcert {
-		if isFlato() || hrm.tcm.cfca {
+		if isFlato(hrm.txVersion) || hrm.tcm.cfca {
 			signature, sysErr := hrm.tcm.sdkCert.Sign(body)
 			if sysErr != nil {
 				logger.Error("sign error", sysErr)
@@ -256,7 +259,6 @@ func (hrm *httpRequestManager) SyncRequestSpecificURL(body []byte, url string, r
 			}
 			req.Header.Add("tcert", hrm.tcm.ecert)
 			req.Header.Add("signature", common.Bytes2Hex(signature))
-			req.Header.Add("msg", common.Bytes2Hex(body))
 		} else {
 			signature, err := hrm.tcm.uniqueCert.Sign(body)
 			if err != nil {
@@ -265,7 +267,6 @@ func (hrm *httpRequestManager) SyncRequestSpecificURL(body []byte, url string, r
 			}
 			req.Header.Add("tcert", string(hrm.tcm.tcertPool[url]))
 			req.Header.Add("signature", common.Bytes2Hex(signature))
-			req.Header.Add("msg", common.Bytes2Hex(body))
 		}
 	}
 
@@ -294,7 +295,7 @@ func (hrm *httpRequestManager) SyncRequestSpecificURL(body []byte, url string, r
 			if fsErr != nil {
 				return nil, NewSystemError(fsErr)
 			}
-			return newFakeJSONResponse(0, "download success"), nil
+			return newFakeJSONResponse(0, "download success", hrm.txVersion), nil
 		} else {
 			ret, err := ioutil.ReadAll(resp.Body)
 			if err != nil {
@@ -468,6 +469,6 @@ func (hrm *httpRequestManager) ReConnectNode(nodeIndex int) {
 
 }
 
-func isFlato() bool {
+func isFlato(TxVersion string) bool {
 	return TxVersion != DefaultTxVersion
 }

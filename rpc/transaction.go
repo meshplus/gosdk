@@ -6,13 +6,15 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"github.com/meshplus/gosdk/common/hexutil"
+	"github.com/meshplus/gosdk/kvsql"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/gogo/protobuf/proto"
-	"github.com/meshplus/crypto-standard/hash"
 	"github.com/meshplus/gosdk/account"
+	"github.com/meshplus/crypto-standard/hash"
 
 	"github.com/meshplus/gosdk/abi"
 	"github.com/meshplus/gosdk/common"
@@ -28,6 +30,7 @@ const (
 	HVM      VMType = "HVM"
 	BVM      VMType = "BVM"
 	TRANSFER VMType = "TRANSFER"
+	KVSQL    VMType = "KVSQL"
 	UNIT            = 32
 	//JSVM VMType = "jsvm"
 
@@ -42,6 +45,17 @@ const (
 
 	// TimeLength is the number length of timestamp
 	TimeLength = 8
+
+	UPDATE                 = 1
+	DID_REGISTER           = 200
+	DID_FREEZE             = 201
+	DID_UNFREEZE           = 202
+	DID_ABANDON            = 203
+	DID_UPDATEPUBLICKEY    = 204
+	DID_UPDATEADMINS       = 205
+	DIDCREDENTIAL_UPLOAD   = 206
+	DIDCREDENTIAL_DOWNLOAD = 207
+	DIDCREDENTIAL_ABANDON  = 208
 )
 
 type TxVersionInt int
@@ -58,6 +72,7 @@ const (
 	TxVersion27 TxVersionInt = 9
 	TxVersion28 TxVersionInt = 10
 	TxVersion29 TxVersionInt = 11
+	TxVersion30 TxVersionInt = 12
 )
 
 // Params interface
@@ -83,6 +98,7 @@ type Transaction struct {
 	isValue       bool
 	isDeploy      bool
 	isMaintain    bool
+	isDID         bool
 	isInvoke      bool
 	isByName      bool
 	extra         string
@@ -122,6 +138,8 @@ func GetTxVersionInt(txVersionStr string) TxVersionInt {
 		return TxVersion28
 	case "2.9":
 		return TxVersion29
+	case "3.0":
+		return TxVersion30
 	default:
 		return TxVersion10
 	}
@@ -129,6 +147,9 @@ func GetTxVersionInt(txVersionStr string) TxVersionInt {
 
 // NewTransaction return a empty transaction
 func NewTransaction(from string) *Transaction {
+	if strings.HasPrefix(from, account.DIDPREFIX) {
+		from = hexutil.Encode([]byte(from))
+	}
 	return &Transaction{
 		timestamp:   getCurTimeStamp(),
 		nonce:       getRandNonce(),
@@ -271,6 +292,10 @@ func (t *Transaction) Invoke(to string, payload []byte) *Transaction {
 	return t
 }
 
+func (t *Transaction) InvokeSql(to string, payload []byte) *Transaction {
+	return t.Invoke(to, append([]byte{kvsql.RawSql}, payload...))
+}
+
 // Invoke add transaction isInvoke
 func (t *Transaction) InvokeByName(name string, payload []byte) *Transaction {
 	if string(payload[0:8]) == "fefffbce" {
@@ -349,6 +374,80 @@ func (t *Transaction) OpCode(op int64) *Transaction {
 	return t
 }
 
+/********did*******/
+
+func (t *Transaction) Register(document *DIDDocument) *Transaction {
+	t.to = t.from
+	t.isDID = true
+	res, _ := json.Marshal(document)
+	payload := common.Bytes2Hex(res)
+	t.payload = chPrefix(payload)
+	t.opcode = DID_REGISTER
+	return t
+}
+func (t *Transaction) MaintainDID(to string, op int64) *Transaction {
+	if strings.HasPrefix(to, account.DIDPREFIX) {
+		to = hexutil.Encode([]byte(to))
+	}
+	t.to = to
+	t.isDID = true
+	t.opcode = op
+	return t
+}
+func (t *Transaction) UpdatePublicKey(to string, puKey *DIDPublicKey) *Transaction {
+	if strings.HasPrefix(to, account.DIDPREFIX) {
+		to = hexutil.Encode([]byte(to))
+	}
+	t.to = to
+	t.isDID = true
+	t.opcode = DID_UPDATEPUBLICKEY
+	res, _ := json.Marshal(puKey)
+	payload := common.Bytes2Hex(res)
+	t.payload = chPrefix(payload)
+	return t
+}
+
+func (t *Transaction) UpdateAdmins(to string, admins []string) *Transaction {
+	if strings.HasPrefix(to, account.DIDPREFIX) {
+		to = hexutil.Encode([]byte(to))
+	}
+	t.to = to
+	t.isDID = true
+	t.opcode = DID_UPDATEADMINS
+	res, _ := json.Marshal(admins)
+	payload := common.Bytes2Hex(res)
+	t.payload = chPrefix(payload)
+	return t
+}
+
+func (t *Transaction) UploadCredential(credential *DIDCredential) *Transaction {
+	t.to = t.from
+	t.isDID = true
+	t.opcode = DIDCREDENTIAL_UPLOAD
+	res, _ := json.Marshal(credential)
+	payload := common.Bytes2Hex(res)
+	t.payload = chPrefix(payload)
+	return t
+}
+
+func (t *Transaction) DownloadCredential(credentialID string) *Transaction {
+	t.to = t.from
+	t.isDID = true
+	t.opcode = DIDCREDENTIAL_DOWNLOAD
+	payload := common.Bytes2Hex([]byte(credentialID))
+	t.payload = chPrefix(payload)
+	return t
+}
+
+func (t *Transaction) DestroyCredential(credentialID string) *Transaction {
+	t.to = t.from
+	t.isDID = true
+	t.opcode = DIDCREDENTIAL_ABANDON
+	payload := common.Bytes2Hex([]byte(credentialID))
+	t.payload = chPrefix(payload)
+	return t
+}
+
 // GetExtraIdString get extraId string
 func (t *Transaction) GetExtraIdString() (string, error) {
 	if t.extraIdInt64 == nil && t.extraIdString == nil {
@@ -400,14 +499,15 @@ func (t *Transaction) getTxVersion() string {
 	return t.txVersion
 }
 
-// SetOptionExtra  set transaction option extra
+// SetExtraIDString set transaction string extraId
 func (t *Transaction) SetOptionExtra(option string) {
+
 	t.optionExtra = option
 }
 
 // needHashString construct a stirng that need to hash
 func needHashString(t *Transaction) string {
-	p := getProcessor()
+	p := getProcessor(t.txVersion)
 	sb := &strings.Builder{}
 	p.process(sb, t)
 	return sb.String()
@@ -452,7 +552,7 @@ func (p *processorWithFlato) process(buffer *strings.Builder, t *Transaction) {
 
 	writeBaseFiled(buffer, t, payload, true)
 	buffer.WriteString("&version=")
-	buffer.WriteString(TxVersion)
+	buffer.WriteString(t.txVersion)
 }
 
 type processorWithFlato21 struct {
@@ -491,14 +591,14 @@ func (p *processorWithFlato22) process(buffer *strings.Builder, t *Transaction) 
 	buffer.WriteString(t.cName)
 }
 
-func getProcessor() processor {
-	if TxVersion < "2" {
+func getProcessor(txVersion string) processor {
+	if txVersion < "2" {
 		return newProcessorWithHyperchain()
 	}
-	if TxVersion < "2.1" {
+	if txVersion < "2.1" {
 		return newProcessorWithFlato()
 	}
-	if TxVersion < "2.2" {
+	if txVersion < "2.2" {
 		return newProcessorWithFlato21()
 	}
 	return newProcessorWithFlato22()
@@ -556,7 +656,11 @@ func (t *Transaction) sign(key interface{}, batch bool) {
 	if isPKIAccount {
 		key = key.(*account.PKIKey).GetNormalKey()
 	}
-	sig, err := sign(key, needHashString(t), batch, isPKIAccount)
+	_, isDIDAccount := key.(*account.DIDKey)
+	if isDIDAccount {
+		key = key.(*account.DIDKey).GetNormalKey()
+	}
+	sig, err := SignWithDID(key, needHashString(t), batch, isPKIAccount, isDIDAccount)
 	if err != nil {
 		logger.Error("ecdsa signature error")
 		return
@@ -621,7 +725,7 @@ func (t *Transaction) Serialize() interface{} {
 
 	param["signature"] = t.signature
 
-	if t.isMaintain {
+	if t.isMaintain || t.isDID {
 		param["opcode"] = t.opcode
 	}
 
@@ -763,6 +867,8 @@ func (t *Transaction) GetTransactionHash(gasLimit int64) string {
 		input.VmType = TransactionValue_BVM
 	case TRANSFER:
 		input.VmType = TransactionValue_TRANSFER
+	case KVSQL:
+		input.VmType = TransactionValue_KVSQL
 	default:
 		return ""
 	}
