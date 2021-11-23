@@ -9,12 +9,14 @@ require (
 	github.com/gogo/protobuf v1.3.1
 	github.com/golang/protobuf v1.3.3
 	github.com/gorilla/websocket v1.4.0
+	github.com/hashicorp/go-uuid v1.0.2 // indirect
 	github.com/hashicorp/hcl v1.0.0 // indirect
 	github.com/json-iterator/go v1.1.9
 	github.com/magiconair/properties v1.8.0
-	github.com/meshplus/crypto-gm v0.1.0
-	github.com/meshplus/crypto-standard v0.1.1
-	github.com/meshplus/flato-msp-cert v0.1.0
+	github.com/meshplus/crypto v0.0.7 // indirect
+	github.com/meshplus/crypto-gm v0.1.1-0.20211119065836-1490186d23a3
+	github.com/meshplus/crypto-standard v0.1.2-0.20211119071602-d13dfca69418
+	github.com/meshplus/flato-msp-cert v0.0.0-20211119111937-5310be23eebf
 	github.com/mholt/archiver v0.0.0-20180417220235-e4ef56d48eb0
 	github.com/mitchellh/mapstructure v1.2.2
 	github.com/nwaples/rardecode v0.0.0-20171029023500-e06696f847ae // indirect

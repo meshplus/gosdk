@@ -4,8 +4,6 @@ import (
 	"crypto/rand"
 	"encoding/pem"
 	"errors"
-	"github.com/meshplus/flato-msp-cert/config"
-	"github.com/meshplus/flato-msp-cert/logger"
 	"github.com/meshplus/flato-msp-cert/plugin"
 	"io/ioutil"
 
@@ -30,7 +28,7 @@ func ParsePriv(k []byte) (*KeyPair, error) {
 		key = block.Bytes
 	}
 
-	engine, _ := plugin.GetCryptoEngine(config.GetMSPClassicConfig(), logger.MSPLoggerSingleCase)
+	engine := plugin.GetCryptoEngine()
 	newKey, err := primitives.UnmarshalPrivateKey(engine, key)
 	if err != nil {
 		return nil, err

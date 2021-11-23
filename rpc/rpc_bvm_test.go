@@ -159,7 +159,7 @@ func TestBVMCheckCert(t *testing.T) {
 }
 
 func TestBVMCreatePermissionProposal(t *testing.T) {
-	//t.Skip()
+	t.Skip()
 	key, err := account.NewAccountFromAccountJSON("", pwd)
 	assert.Nil(t, err)
 	var operations []bvm.PermissionOperation
