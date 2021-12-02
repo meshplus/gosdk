@@ -2,7 +2,6 @@ package account
 
 import (
 	"bytes"
-	"crypto"
 	"crypto/des"
 	"crypto/rand"
 	"encoding/base64"
@@ -15,7 +14,7 @@ import (
 	"github.com/meshplus/crypto-standard/asym"
 	"github.com/meshplus/crypto-standard/ed25519"
 	pkcs12 "github.com/meshplus/flato-msp-cert/pfx"
-	"github.com/meshplus/flato-msp-cert/primitives/x509"
+	"github.com/meshplus/flato-msp-cert/plugin"
 	"strings"
 
 	"github.com/meshplus/gosdk/common"
@@ -40,12 +39,20 @@ const (
 	ED25519AES  = "0x23"
 	ED255193DES = "0x24"
 
+	ECKDF2R1 = "0x011"
+	ECDESR1  = "0x021"
+	ECRAWR1  = "0x031"
+	ECAESR1  = "0x041"
+	EC3DESR1 = "0x051"
+
 	PKI = "0x41"
 
 	V1 = "1.0"
 	V2 = "2.0"
 	V3 = "3.0"
 	V4 = "4.0"
+
+	DIDPREFIX = "did:hpc:"
 )
 
 var omittedError = errors.New("parse account json error: can not parse account json with 4.0 version without algo attribute")
@@ -156,24 +163,24 @@ func NewAccountJson(acType, password string) (string, error) {
 	var privateKey []byte
 
 	if strings.HasPrefix(acType, "0x0") {
-		key, err := asym.GenerateKey(asym.AlgoP256K1)
+		key, err := asym.GenerateKey(asym.AlgoP256K1Recover)
+		if len(acType) == 5 && acType[4] == '1' {
+			key, err = asym.GenerateKey(asym.AlgoP256R1)
+		}
 		if err != nil {
 			return "", err
 		}
 		switch acType {
-		case ECKDF2:
+		case ECKDF2, ECKDF2R1:
 			return "", errors.New("not support KDF2 now")
-		case ECDES:
-			accountJson.Algo = ECDES
+		case ECDES, ECDESR1:
 			privateKey, err = DesEncrypt(math.PaddedBigBytes(key.D, 32), []byte(password))
 			if err != nil {
 				return "", err
 			}
-		case ECRAW:
-			accountJson.Algo = ECRAW
+		case ECRAW, ECRAWR1:
 			privateKey = math.PaddedBigBytes(key.D, 32)
-		case ECAES:
-			accountJson.Algo = ECAES
+		case ECAES, ECAESR1:
 			aes := new(inter.AES)
 			reader := bytes.NewReader(AtPadding([]byte(password), 32)[:16])
 			privateKey, err = aes.Encrypt(AtPadding([]byte(password), 32), math.PaddedBigBytes(key.D, 32), reader)
@@ -181,8 +188,7 @@ func NewAccountJson(acType, password string) (string, error) {
 				return "", err
 			}
 			privateKey = privateKey[16:]
-		case EC3DES:
-			accountJson.Algo = EC3DES
+		case EC3DES, EC3DESR1:
 			privateKey, err = inter.TripleDesEncrypt8(math.PaddedBigBytes(key.D, 32), AtPadding([]byte(password), 24))
 			if err != nil {
 				return "", err
@@ -190,6 +196,7 @@ func NewAccountJson(acType, password string) (string, error) {
 		default:
 			return "", errors.New("not support crypt type " + acType)
 		}
+		accountJson.Algo = acType
 		accountJson.Version = V4
 		//if acType == ECDES {
 		//	accountJson.Version = V1
@@ -338,7 +345,13 @@ func GenKeyFromAccountJson(accountJson, password string) (key interface{}, err e
 	}
 
 	if strings.HasPrefix(account.Algo, "0x0") {
-		ecdsaKey, err := NewAccountFromPriv(common.Bytes2Hex(priv))
+		var ecdsaKey *ECDSAKey
+		var err error
+		if len(account.Algo) == 4 {
+			ecdsaKey, err = NewAccountFromPriv(common.Bytes2Hex(priv))
+		} else {
+			ecdsaKey, err = NewAccountR1FromPriv(common.Bytes2Hex(priv))
+		}
 		if err != nil {
 			return nil, err
 		}
@@ -419,11 +432,16 @@ func ParseAccountJson(accountJson, password string) (newAccountJson string, err 
 		publicKey = account["publicKey"].(string)
 	} else if strings.HasPrefix(algo, "0x0") {
 		var decryptedPriv []byte
+		var key *ECDSAKey
 		decryptedPriv, err = decryptPriv(privateKey, algo, password)
 		if err != nil {
 			return "", err
 		}
-		key, err := NewAccountFromPriv(common.Bytes2Hex(decryptedPriv))
+		if len(algo) == 4 {
+			key, err = NewAccountFromPriv(common.Bytes2Hex(decryptedPriv))
+		} else {
+			key, err = NewAccountR1FromPriv(common.Bytes2Hex(decryptedPriv))
+		}
 		if err != nil {
 			return "", errors.New("error private key")
 		}
@@ -468,19 +486,19 @@ func ParseAccountJson(accountJson, password string) (newAccountJson string, err 
 func decryptPriv(encrypted, algo, password string) (priv []byte, err error) {
 	if strings.HasPrefix(algo, "0x0") {
 		switch algo {
-		case ECKDF2:
+		case ECKDF2, ECKDF2R1:
 			return nil, errors.New("not support KDF2 now")
-		case ECDES:
+		case ECDES, ECDESR1:
 			priv, err = DesDecrypt(common.Hex2Bytes(encrypted), []byte(password))
-		case ECRAW:
+		case ECRAW, ECRAWR1:
 			priv = common.Hex2Bytes(encrypted)
-		case ECAES:
+		case ECAES, ECAESR1:
 			aes := new(inter.AES)
 			encryptedBytes := common.Hex2Bytes(encrypted)
 			a := AtPadding([]byte(password), 32)[:16]
 			encryptedBytes = append(a, encryptedBytes...)
 			priv, err = aes.Decrypt(AtPadding([]byte(password), 32), encryptedBytes)
-		case EC3DES:
+		case EC3DES, EC3DESR1:
 			priv, err = inter.TripleDesDecrypt8(common.Hex2Bytes(encrypted), AtPadding([]byte(password), 24))
 		default:
 			return nil, errors.New("not support crypt type " + algo)
@@ -561,11 +579,16 @@ func NewAccountFromPriv(priv string) (*ECDSAKey, error) {
 	if priv == "" {
 		return nil, errors.New("private key is nil")
 	}
-	key := new(asym.ECDSAPrivateKey).FromBytes(common.Hex2Bytes(priv), asym.AlgoP256K1Recover)
-	if key == nil {
+	key := new(asym.ECDSAPrivateKey)
+	err := key.FromBytes(common.Hex2Bytes(priv), asym.AlgoP256K1Recover)
+	if err != nil {
 		return nil, errors.New("create ecdsa key failed")
 	}
 	return &ECDSAKey{key}, nil
+}
+
+func NewDIDAccount(key Key, chainID, suffix string) (didKey *DIDKey) {
+	return &DIDKey{Key: key, address: DIDPREFIX + chainID + ":" + suffix}
 }
 
 // NewAccountFromAccountJSON ECDSA Key结构体
@@ -617,7 +640,7 @@ func NewAccountFromCert(pfx []byte, password string) (key *PKIKey, err error) {
 	if err != nil {
 		return nil, err
 	}
-	sk, ok := skey.(crypto.Signer)
+	sk, ok := skey.(*plugin.PrivateKey)
 	if !ok {
 		return nil, fmt.Errorf("unknown key type")
 	}
@@ -629,8 +652,8 @@ func NewAccountFromCert(pfx []byte, password string) (key *PKIKey, err error) {
 	copy(addr[:], addrBytes)
 	rawcert := base64.StdEncoding.EncodeToString(pfx)
 	var encodedprivkey string
-	if cert.PublicKeyAlgorithm == x509.ECDSA {
-		tmp, err := sk.(*asym.ECDSAPrivateKey).Bytes()
+	if cert.PublicKeyAlgorithm == plugin.ECDSA {
+		tmp, err := sk.PrivKey.(*asym.ECDSAPrivateKey).Bytes()
 		if err != nil {
 			return nil, errors.New("get bytes failed")
 		}
@@ -641,8 +664,8 @@ func NewAccountFromCert(pfx []byte, password string) (key *PKIKey, err error) {
 			return nil, errors.New("encrypt failed")
 		}
 		encodedprivkey = common.Bytes2Hex(finalprivkey)
-	} else if cert.PublicKeyAlgorithm == x509.SM2 {
-		tmp, err := sk.(*gm.SM2PrivateKey).Bytes()
+	} else if cert.PublicKeyAlgorithm == plugin.SM2 {
+		tmp, err := sk.PrivKey.(*gm.SM2PrivateKey).Bytes()
 		if err != nil {
 			return nil, errors.New("generate pki key failed")
 		}
@@ -656,7 +679,7 @@ func NewAccountFromCert(pfx []byte, password string) (key *PKIKey, err error) {
 		rawcert:        rawcert,
 		encodedprivkey: encodedprivkey,
 		cert:           cert,
-		sk:             sk,
+		sk:             sk.PrivKey,
 		addr:           addr,
 	}, nil
 }
@@ -679,10 +702,36 @@ func NewAccountED25519(password string) (string, error) {
 	}
 }
 
+// NewAccountR1 生成国密
+func NewAccountR1(password string) (string, error) {
+	if password != "" {
+		return NewAccountJson(ECDESR1, password)
+	} else {
+		return NewAccountJson(ECRAWR1, password)
+	}
+}
+
+// NewAccountFromPriv 从私钥字节数组得到ECDSA Key结构体
+func NewAccountR1FromPriv(priv string) (*ECDSAKey, error) {
+	if priv == "" {
+		return nil, errors.New("private key is nil")
+	}
+	key := new(asym.ECDSAPrivateKey)
+	err := key.FromBytes(common.Hex2Bytes(priv), asym.AlgoP256R1)
+	if err == nil {
+		return nil, errors.New("create ecdsa key failed")
+	}
+	return &ECDSAKey{key}, nil
+}
+
 // NewAccountSm2FromPriv 从私钥字符串生成国密结构体
 func NewAccountSm2FromPriv(priv string) (*SM2Key, error) {
 	priv = strings.TrimPrefix(priv, "00")
-	key := new(gm.SM2PrivateKey).FromBytes(common.Hex2Bytes(priv))
+	key := new(gm.SM2PrivateKey)
+	err := key.FromBytes(common.Hex2Bytes(priv), 0)
+	if err != nil {
+		return nil, err
+	}
 	privKey := key.CalculatePublicKey()
 	pub := privKey.PublicKey
 	privKey = privKey.SetPublicKey(&pub)
@@ -695,8 +744,10 @@ func newAccountED25519FromPriv(priv string) (*ED25519Key, error) {
 		return nil, errors.New("private key is nil")
 	}
 	key := new(ed25519.EDDSAPrivateKey)
-	key.FromBytes(common.Hex2Bytes(priv), nil)
-
+	err := key.FromBytes(common.Hex2Bytes(priv), 0)
+	if err != nil {
+		return nil, err
+	}
 	return &ED25519Key{key}, nil
 }
 

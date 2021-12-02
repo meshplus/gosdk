@@ -1,6 +1,7 @@
 package bvm
 
 import (
+	"encoding/hex"
 	"encoding/json"
 	"strconv"
 )
@@ -54,9 +55,23 @@ const (
 	// AccountAbandon account contract method `Logout`
 	AccountAbandon ContractMethod = "Abandon"
 
+	SetchainID ContractMethod = "SetChainID"
+
+	//CertRevoke cert contract method `CertRevoke`
+	CertRevoke ContractMethod = "CertRevoke"
+	//CertCheck cert contract method `CheckRevoke`
+	CertCheck ContractMethod = "CertCheck"
+
+	//CertFreeze cert contract method `CertFreeze`
+	CertFreeze ContractMethod = "CertFreeze"
+	//CertUnfreeze cert contract method `CertUnfreeze`
+	CertUnfreeze ContractMethod = "CertUnfreeze"
+
 	accountAddress  = "0x0000000000000000000000000000000000ffff04"
 	proposalAddress = "0x0000000000000000000000000000000000ffff02"
 	hashAddress     = "0x0000000000000000000000000000000000ffff01"
+	certAddress     = "0x0000000000000000000000000000000000ffff05"
+	didAddress      = "0x0000000000000000000000000000000000ffff06"
 )
 
 // ProposalType proposal type
@@ -130,6 +145,14 @@ func (ao *AccountOperationImpl) Address() string {
 	return accountAddress
 }
 
+type CertOperationImpl struct {
+	operationImpl
+}
+
+func (po *CertOperationImpl) Address() string {
+	return certAddress
+}
+
 type ProposalContentOperation interface {
 	Operation
 	ProposalType()
@@ -185,6 +208,16 @@ type contractOperationImpl struct {
 func (co *contractOperationImpl) ProposalType() {}
 
 func (co *contractOperationImpl) ContractType() {}
+
+//DIDOperationImpl used for set chainID
+type DIDOperationImpl struct {
+	operationImpl
+}
+
+//Address return did contract address
+func (did *DIDOperationImpl) Address() string {
+	return didAddress
+}
 
 // NewProposalCreateOperationForContract new proposal create operation for contract operation
 func NewProposalCreateOperationForContract(ops ...ContractOperation) BuiltinOperation {
@@ -408,6 +441,73 @@ func NewAccountRegisterOperation(address string, cert []byte) BuiltinOperation {
 // NewAccountAbandonOperation create a new AccountAbandon operation and return
 func NewAccountAbandonOperation(address string, sdkCert []byte) BuiltinOperation {
 	return newAccountOperation(AccountAbandon, address, string(sdkCert))
+}
+
+func newCertOperation(method ContractMethod, args ...string) *CertOperationImpl {
+	return &CertOperationImpl{operationImpl{method: method, args: args}}
+}
+
+// NewCertRevokeOperation create a new CertRevoke operation and return
+func NewCertRevokeOperation(cert, priv []byte) (BuiltinOperation, error) {
+	msg := "revoke"
+	sign := []byte(msg)
+	if priv != nil {
+		key, err := ParsePriv(priv)
+		if err != nil {
+			return nil, err
+		}
+		sign, err = key.Sign([]byte(msg))
+		if err != nil {
+			return nil, err
+		}
+	}
+	return newCertOperation(CertRevoke, string(cert), msg, hex.EncodeToString(sign)), nil
+}
+
+// NewCertFreezeOperation create a new CertFreeze operation and return
+func NewCertFreezeOperation(cert, priv []byte) (BuiltinOperation, error) {
+	msg := "freeze"
+	sign := []byte(msg)
+	if priv != nil {
+		key, err := ParsePriv(priv)
+		if err != nil {
+			return nil, err
+		}
+		sign, err = key.Sign([]byte(msg))
+		if err != nil {
+			return nil, err
+		}
+	}
+	return newCertOperation(CertFreeze, string(cert), msg, hex.EncodeToString(sign)), nil
+}
+
+// NewCertUnfreezeOperation create a new CertUnfreeze operation and return
+func NewCertUnfreezeOperation(cert, priv []byte) (BuiltinOperation, error) {
+	msg := "unfreeze"
+	sign := []byte(msg)
+	if priv != nil {
+		key, err := ParsePriv(priv)
+		if err != nil {
+			return nil, err
+		}
+		sign, err = key.Sign([]byte(msg))
+		if err != nil {
+			return nil, err
+		}
+	}
+	return newCertOperation(CertUnfreeze, string(cert), msg, hex.EncodeToString(sign)), nil
+}
+
+// NewCertCheckOperation create a new CertCheck operation and return
+func NewCertCheckOperation(cert []byte) BuiltinOperation {
+	return newCertOperation(CertCheck, string(cert))
+}
+
+//NewDIDSetChainIDOperation create a setChainID operation
+func NewDIDSetChainIDOperation(chainID string) BuiltinOperation {
+	return &DIDOperationImpl{
+		operationImpl{method: SetchainID, args: []string{chainID}},
+	}
 }
 
 // operationImpl the implementation of Operation

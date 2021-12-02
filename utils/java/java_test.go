@@ -2,22 +2,21 @@ package java
 
 import (
 	"fmt"
-	gm "github.com/meshplus/crypto-gm"
-	"github.com/meshplus/crypto-standard/hash"
-	"testing"
-	"time"
-
 	"github.com/coreos/etcd/pkg/testutil"
 	"github.com/meshplus/gosdk/common"
 	"github.com/meshplus/gosdk/rpc"
 	"github.com/stretchr/testify/assert"
+	gm "github.com/meshplus/crypto-gm"
+	"github.com/meshplus/crypto-standard/hash"
+	"testing"
 )
 
 var (
 	hrpc = rpc.NewRPCWithPath("../../conf")
 
 	guomiPri = "6153af264daa4763490f2a51c9d13417ef9f579229be2141574eb339ee9b9d2a"
-	pri      = new(gm.SM2PrivateKey).FromBytes(common.FromHex(guomiPri))
+	pri      = new(gm.SM2PrivateKey)
+	_        = pri.FromBytes(common.FromHex(guomiPri), 0)
 
 	guomiKey = &gm.SM2PrivateKey{
 		K:         pri.K,
@@ -25,20 +24,6 @@ var (
 	}
 	contractAddress = "0x31cf62472b1856d94553d2fe78f3bb067afb0714"
 )
-
-type TestAsyncHandler struct {
-	t        *testing.T
-	IsCalled bool
-}
-
-func (tah *TestAsyncHandler) OnSuccess(receipt *rpc.TxReceipt) {
-	tah.IsCalled = true
-	fmt.Println(receipt.Ret)
-}
-
-func (tah *TestAsyncHandler) OnFailure(err rpc.StdError) {
-	tah.t.Error(err.String())
-}
 
 func TestEncodeJavaFunc(t *testing.T) {
 	res := EncodeJavaFunc("add", "tomkk", "tomkk")
@@ -48,25 +33,6 @@ func TestEncodeJavaFunc(t *testing.T) {
 func TestDecodeJavaResult(t *testing.T) {
 	str := "Mr.汤"
 	testutil.AssertEqual(t, "Mr.汤", DecodeJavaResult(common.Bytes2Hex([]byte(str))))
-}
-
-func TestDeployJavaContract(t *testing.T) {
-	t.Skip()
-	payload, err := ReadJavaContract("../../conf/contract/contract01")
-	if err != nil {
-		t.Error(err)
-		return
-	}
-	pubKeyBytes, _ := guomiKey.Public().(*gm.SM2PublicKey).Bytes()
-	h, _ := hash.NewHasher(hash.KECCAK_256).Hash(pubKeyBytes)
-	address := h[12:]
-
-	tx := rpc.NewTransaction(common.BytesToAddress(address).Hex()).Deploy(payload).VMType(rpc.JVM)
-	tx.Sign(guomiKey)
-	asyncHandler := TestAsyncHandler{t: t}
-	hrpc.DeployContractAsync(tx, &asyncHandler)
-	time.Sleep(3 * time.Second)
-	assert.EqualValues(t, true, asyncHandler.IsCalled, "回调未被执行")
 }
 
 func TestInvokeJavaContract(t *testing.T) {

@@ -1,94 +1,22 @@
 package rpc
 
 import (
-	"crypto/rand"
-	"encoding/pem"
-	"errors"
 	"fmt"
-	gm "github.com/meshplus/crypto-gm"
-	"github.com/meshplus/crypto-standard/asym"
-	"github.com/meshplus/crypto-standard/hash"
-	"github.com/meshplus/flato-msp-cert/primitives"
-	"github.com/meshplus/gosdk/common"
-	"github.com/terasum/viper"
+	"github.com/meshplus/gosdk/bvm"
 	"io/ioutil"
 	"strings"
+
+	"github.com/meshplus/gosdk/common"
+	"github.com/terasum/viper"
 )
-
-// KeyPair privateKey(ecdsa.PrivateKey or guomi.PrivateKey) and publicKey string
-type KeyPair struct {
-	privKey interface{}
-	pubKey  string
-}
-
-//ParsePriv parse key pair by file path
-func ParsePriv(path string) (*KeyPair, error) {
-	k, err := ioutil.ReadFile(path)
-	if err != nil {
-		return nil, err
-	}
-	var key []byte
-	block, _ := pem.Decode(k)
-	if block != nil {
-		key = block.Bytes
-	}
-
-	newKey, err := primitives.UnmarshalPrivateKey(key)
-	if err != nil {
-		return nil, err
-	}
-	var pub []byte
-	switch key := newKey.(type) {
-	case *asym.ECDSAPrivateKey:
-		pub, _ = primitives.MarshalPublicKey(key.Public())
-	case *gm.SM2PrivateKey:
-		pub, _ = primitives.MarshalPublicKey(key.Public())
-	}
-	keyPair := &KeyPair{
-		privKey: newKey,
-		pubKey:  common.Bytes2Hex(pub),
-	}
-	return keyPair, nil
-}
-
-// newKeyPair create a new KeyPair(ecdsa or sm2)
-func newKeyPair(privFilePath string) (*KeyPair, error) {
-
-	return ParsePriv(privFilePath)
-}
-
-// Sign sign the message by privateKey
-func (key *KeyPair) Sign(msg []byte) ([]byte, error) {
-	switch key.privKey.(type) {
-	case *asym.ECDSAPrivateKey:
-		//to maintain compatibility, sdkcert's signature is always sha256
-		h, _ := hash.NewHasher(hash.SHA2_256).Hash(msg)
-		data, err := key.privKey.(*asym.ECDSAPrivateKey).Sign(rand.Reader, h, nil)
-		if err != nil {
-			return nil, err
-		}
-		return data, nil
-	case *gm.SM2PrivateKey:
-		gmKey := key.privKey.(*gm.SM2PrivateKey)
-		h := gm.HashBeforeSM2(gmKey.Public().(*gm.SM2PublicKey), msg)
-		data, err := gmKey.Sign(rand.Reader, h, nil)
-		if err != nil {
-			return nil, err
-		}
-		return data, nil
-	default:
-		logger.Error("unsupported sign type")
-		return nil, NewSystemError(errors.New("signature type error"))
-	}
-}
 
 // TCert tcert message
 type TCert string
 
 // TCertManager manager tcert
 type TCertManager struct {
-	sdkCert        *KeyPair
-	uniqueCert     *KeyPair
+	sdkCert        *bvm.KeyPair
+	uniqueCert     *bvm.KeyPair
 	ecert          string
 	tcertPool      map[string]TCert
 	sdkcertPath    string
@@ -120,16 +48,16 @@ func NewTCertManager(vip *viper.Viper, confRootPath string) *TCertManager {
 	logger.Debugf("[CONFIG]: cfca = %v", cfca)
 
 	var (
-		sdkCert    *KeyPair
-		uniqueCert *KeyPair
+		sdkCert    *bvm.KeyPair
+		uniqueCert *bvm.KeyPair
 		err        error
 	)
 
-	sdkCert, err = newKeyPair(sdkcertPriPath)
+	sdkCert, err = bvm.NewKeyPair(sdkcertPriPath)
 	if err != nil {
 		panic(fmt.Sprintf("read sdkcertPri from %s failed", sdkcertPriPath))
 	}
-	uniqueCert, err = newKeyPair(uniquePrivPath)
+	uniqueCert, err = bvm.NewKeyPair(uniquePrivPath)
 	if err != nil {
 		panic(fmt.Sprintf("read uniquePriv from %s failed", uniquePrivPath))
 

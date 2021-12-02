@@ -10,7 +10,6 @@ import (
 )
 
 func TestGetECert(t *testing.T) {
-	t.Skip()
 	confRootPath := "../conf"
 	vip := viper.New()
 	vip.SetConfigFile(filepath.Join(confRootPath, common.DefaultConfRelPath))
@@ -20,4 +19,8 @@ func TestGetECert(t *testing.T) {
 	}
 	tcm := NewTCertManager(vip, confRootPath)
 	assert.Equal(t, true, len(tcm.GetECert()) > 0)
+}
+
+func TestGetTCert(t *testing.T) {
+	_, _ = rpc.GetTCert(0)
 }

@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/meshplus/gosdk/account"
-	"github.com/meshplus/gosdk/common"
 	"syscall"
 
 	"github.com/pkg/errors"
@@ -15,13 +14,13 @@ import (
 )
 
 const (
-	// TypeDownload FileDownload
+	// FileDownload Type
 	TypeDownload = "download"
-	// TypeUpload FileUpload
+	// FileUpload Type
 	TypeUpload = "upload"
-	// TypePush FilePush
+	//
 	TypePush = "push"
-	// Stream content type stream
+	// content type stream
 	Stream = "application/octet-stream"
 )
 
@@ -56,7 +55,7 @@ func (rpc *RPC) callFM(method string, nodeID int, requestType RequestType, extra
 }
 
 // FileUpload 文件上传接口
-func (rpc *RPC) FileUpload(filePath string, description string, whiteList []common.Address, nodeID int, accountJson string, password string) (string, StdError) {
+func (rpc *RPC) FileUpload(filePath string, description string, userList []string, nodeIdList []int, pushNodes []int, accountJson string, password string) (string, StdError) {
 	// check filePath is valid
 	filePath, cerr := uploadFilePathCheck(filePath)
 	if cerr != nil {
@@ -66,12 +65,33 @@ func (rpc *RPC) FileUpload(filePath string, description string, whiteList []comm
 	if err != nil {
 		return "", NewSystemError(err)
 	}
-	defer file.Close()
+	defer func() {
+		_ = file.Close()
+	}()
+	fileInfo, err := file.Stat()
+	if err != nil {
+		return "", NewSystemError(err)
+	}
 
 	// build fileExtra
-	nodeHash, gerr := rpc.GetNodeHashByID(nodeID)
-	if gerr != nil {
-		return "", gerr
+	var nodeList []string
+	for _, nodeID := range nodeIdList {
+		nodeHash, gerr := rpc.GetNodeHashByID(nodeID)
+		if gerr != nil {
+			return "", gerr
+		}
+		nodeList = append(nodeList, nodeHash)
+	}
+	var optionExtra string
+	for i, nodeID := range pushNodes {
+		nodeHash, gerr := rpc.GetNodeHashByID(nodeID)
+		if gerr != nil {
+			return "", gerr
+		}
+		optionExtra += nodeHash
+		if i != len(pushNodes)-1 {
+			optionExtra += ","
+		}
 	}
 	hash, herr := GetFileHash(file)
 	if herr != nil {
@@ -79,11 +99,12 @@ func (rpc *RPC) FileUpload(filePath string, description string, whiteList []comm
 	}
 	_, fileName := filepath.Split(filePath)
 	fileExtra := &FileExtra{
-		hash:            hash,
-		whiteList:       whiteList,
-		fileName:        fileName,
-		fileDescription: description,
-		nodeHash:        nodeHash,
+		Hash:            hash,
+		UserList:        userList,
+		FileName:        fileName,
+		FileSize:        fileInfo.Size(),
+		FileDescription: description,
+		NodeList:        nodeList,
 	}
 	extraString, jerr := fileExtra.ToJson()
 	if jerr != nil {
@@ -99,7 +120,9 @@ func (rpc *RPC) FileUpload(filePath string, description string, whiteList []comm
 	from := key.(account.Key).GetAddress().Hex()
 
 	fileUploadTX := NewTransaction(from).To(from).Value(0).Extra(extraString)
-	fileUploadTX.SetExtraIDString(fileExtra.hash)
+	fileUploadTX.txVersion = rpc.txVersion
+	fileUploadTX.SetExtraIDString(fileExtra.Hash)
+	fileUploadTX.SetOptionExtra(optionExtra)
 	fileUploadTX.Sign(key)
 
 	_, serr := file.Seek(0, 0)
@@ -111,7 +134,7 @@ func (rpc *RPC) FileUpload(filePath string, description string, whiteList []comm
 	extraHeaders := make(map[string]string)
 	extraHeaders["type"] = TypeUpload
 
-	result, cerr := rpc.callFM(method, nodeID, UPLOAD, extraHeaders, file, fileUploadTX.Serialize())
+	result, cerr := rpc.callFM(method, nodeIdList[0], UPLOAD, extraHeaders, file, fileUploadTX.Serialize())
 	if cerr != nil {
 		return "", cerr
 	}
@@ -124,9 +147,22 @@ func (rpc *RPC) FileUpload(filePath string, description string, whiteList []comm
 	return strResult, nil
 }
 
+// FileDownloadByTxHash 文件下载接口，通过交易哈希直接下载文件
+func (rpc *RPC) FileDownloadByTxHash(tarPath, txHash string, nodeID int, accountJson string, password string) (string, StdError) {
+	txInfo, err := rpc.GetTransactionByHash(txHash)
+	if err != nil {
+		return "", err
+	}
+	var fileExtra *FileExtra
+	uerr := json.Unmarshal([]byte(txInfo.Extra), &fileExtra)
+	if uerr != nil {
+		return "", NewSystemError(uerr)
+	}
+	return rpc.FileDownload(tarPath, fileExtra.Hash, txInfo.From, nodeID, accountJson, password)
+}
+
 // FileDownload 文件下载接口,tarPath有两种使用：1.传有效目录，会在给路径下以hash作为文件名保存文件；2.传有效文件路径,对该文件进行断点续传
-// Deprecated: will be deleted, use FileDownloadWithAccount instead
-func (rpc *RPC) FileDownload(fileDownloadTX *Transaction, tarPath string, hash string, nodeID int) (string, StdError) {
+func (rpc *RPC) FileDownload(tarPath, hash, owner string, nodeID int, accountJson string, password string) (string, StdError) {
 	tarPath, aerr := filepath.Abs(tarPath)
 	if aerr != nil {
 		return "", NewSystemError(aerr)
@@ -194,93 +230,7 @@ func (rpc *RPC) FileDownload(fileDownloadTX *Transaction, tarPath string, hash s
 	extraHeaders["pos"] = strconv.FormatInt(pos, 10)
 	extraHeaders["type"] = TypeDownload
 
-	_, cerr := rpc.callFM(method, nodeID, DOWNLOAD, extraHeaders, file, fileDownloadTX.Serialize())
-	if cerr != nil {
-		if info.IsDir() {
-			stat, serr := file.Stat()
-			if serr == nil && stat.Size() == 0 {
-				logger.Debugf("File download failed, try to delete empty file %s.", file.Name())
-				rerr := os.Remove(file.Name())
-				if rerr != nil {
-					logger.Warning("delete empty file failed.")
-				}
-			}
-		}
-		return "", cerr
-	}
-
-	return downloadPath, nil
-}
-
-// FileDownloadWithAccount 文件下载接口,tarPath有两种使用：1.传有效目录，会在给路径下以hash作为文件名保存文件；2.传有效文件路径,对该文件进行断点续传
-func (rpc *RPC) FileDownloadWithAccount(tarPath, hash, owner string, nodeID int, accountJson string, password string) (string, StdError) {
-	tarPath, aerr := filepath.Abs(tarPath)
-	if aerr != nil {
-		return "", NewSystemError(aerr)
-	}
-	info, serr := os.Stat(tarPath)
-	if serr != nil {
-		return "", NewSystemError(serr)
-	}
-	if hash == "" {
-		return "", NewSystemError(errors.New("hash is empty"))
-	}
-
-	var downloadPath string
-	var pos int64
-	var file *os.File
-	var oerr error
-	if info.IsDir() {
-		downloadPath = filepath.Join(tarPath, hash)
-		suffix := 0
-		for {
-			_, tserr := os.Stat(downloadPath)
-			if tserr != nil {
-				if os.IsNotExist(tserr) {
-					file, oerr = os.OpenFile(downloadPath, os.O_CREATE|os.O_RDWR, 0644)
-					if oerr != nil {
-						return "", NewSystemError(oerr)
-					}
-					lerr := syscall.Flock(int(file.Fd()), syscall.LOCK_EX|syscall.LOCK_NB)
-					if lerr == nil {
-						break
-					} else {
-						_ = file.Close()
-					}
-				} else {
-					return "", NewSystemError(tserr)
-				}
-			}
-			suffix++
-			downloadPath = fmt.Sprintf("%s(%s)", filepath.Join(tarPath, hash), strconv.Itoa(suffix))
-		}
-	} else {
-		downloadPath = tarPath
-		pos = info.Size()
-		file, oerr = os.OpenFile(downloadPath, os.O_RDWR, 0644)
-		if oerr != nil {
-			return "", NewSystemError(oerr)
-		}
-		lerr := syscall.Flock(int(file.Fd()), syscall.LOCK_EX|syscall.LOCK_NB)
-		if lerr != nil {
-			return "", NewSystemError(lerr)
-		}
-	}
-
-	defer func() {
-		err := syscall.Flock(int(file.Fd()), syscall.LOCK_UN)
-		if err != nil {
-			logger.Warningf("file %s release lock failed", file.Name())
-		}
-		_ = file.Close()
-	}()
-
-	method := FILE + TypeDownload
-
-	extraHeaders := make(map[string]string)
-	extraHeaders["pos"] = strconv.FormatInt(pos, 10)
-	extraHeaders["type"] = TypeDownload
-
+	// tran accountJson to key
 	key, kerr := account.GenKeyFromAccountJson(accountJson, password)
 	if kerr != nil {
 		return "", NewSystemError(kerr)
@@ -340,6 +290,7 @@ func (rpc *RPC) FilePush(hash string, pushNodes []int, accountJson, password str
 		}
 	}
 
+	// tran accountJson to key
 	key, kerr := account.GenKeyFromAccountJson(accountJson, password)
 	if kerr != nil {
 		return "", NewSystemError(kerr)
@@ -351,6 +302,7 @@ func (rpc *RPC) FilePush(hash string, pushNodes []int, accountJson, password str
 	filePushTX.txVersion = rpc.txVersion
 	filePushTX.SetExtraIDString(hash)
 	filePushTX.Sign(key)
+	filePushTX.SetOptionExtra(optionExtra)
 
 	result, cerr := rpc.callFM(method, nodeID, GENERAL, extraHeaders, nil, filePushTX.Serialize())
 	if cerr != nil {
@@ -389,12 +341,12 @@ func (rpc *RPC) GetFileExtraByExtraId(extraId string) (*FileExtra, error) {
 		return nil, NewSystemError(errors.New("firstTx data trans fail"))
 	}
 
-	var fileExtraRaw FileExtraRaw
+	var fileExtraRaw *FileExtra
 	uerr := json.Unmarshal([]byte(firstTx["extra"].(string)), &fileExtraRaw)
 	if uerr != nil {
 		return nil, NewSystemError(uerr)
 	}
-	return fileExtraRaw.toFileExtra(), nil
+	return fileExtraRaw, nil
 }
 
 // GetFileExtraByFilter 通过filter获取文件信息FileExtra
@@ -424,12 +376,28 @@ func (rpc *RPC) GetFileExtraByFilter(from, extraId string) (*FileExtra, StdError
 		return nil, NewSystemError(errors.New("firstTx data trans fail"))
 	}
 
-	var fileExtraRaw FileExtraRaw
+	var fileExtraRaw *FileExtra
 	uerr := json.Unmarshal([]byte(firstTx["extra"].(string)), &fileExtraRaw)
 	if uerr != nil {
 		return nil, NewSystemError(uerr)
 	}
-	return fileExtraRaw.toFileExtra(), nil
+	return fileExtraRaw, nil
+}
+
+// GetFileExtraByTxHash 通过交易哈希获取文件信息FileExtra
+func (rpc *RPC) GetFileExtraByTxHash(txHash string) (*FileExtra, StdError) {
+
+	txInfo, err := rpc.GetTransactionByHash(txHash)
+	if err != nil {
+		return nil, err
+	}
+
+	var fileExtraRaw *FileExtra
+	uerr := json.Unmarshal([]byte(txInfo.Extra), &fileExtraRaw)
+	if uerr != nil {
+		return nil, NewSystemError(uerr)
+	}
+	return fileExtraRaw, nil
 }
 
 // streamFileStorage get data from stream and store to file
@@ -463,9 +431,9 @@ func streamFileStorage(writeSeeker io.WriteSeeker, reader io.Reader, pos int64) 
 	return ferr
 }
 
-func newFakeJSONResponse(code int, message string) []byte {
+func newFakeJSONResponse(code int, message string, txVersion string) []byte {
 	resp := &JSONResponse{
-		Version:   TxVersion,
+		Version:   txVersion,
 		ID:        0,
 		Result:    nil,
 		Namespace: "global",

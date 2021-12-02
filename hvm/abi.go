@@ -62,7 +62,7 @@ type Abi []BeanAbi
 
 func (abi Abi) GetBeanAbi(beanName string) (*BeanAbi, error) {
 	for _, beanAbi := range abi {
-		if beanAbi.BeanName == beanName && (beanAbi.BeanType == "" || beanAbi.BeanType == InvokeBean) {
+		if beanAbi.BeanName == beanName {
 			return &beanAbi, nil
 		}
 	}

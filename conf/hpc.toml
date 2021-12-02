@@ -74,6 +74,6 @@ reConnectTime = 10000
 [tx]
     # if it is use for hyperchain, please use 1.0 to replace default
     # if use for flato, please use 2.0 to replace default
-    version = "2.4"
+    version = "2.5"
 
 

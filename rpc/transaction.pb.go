@@ -66,6 +66,7 @@ const (
 	TransactionValue_HVM      TransactionValue_VmType = 2
 	TransactionValue_BVM      TransactionValue_VmType = 3
 	TransactionValue_TRANSFER TransactionValue_VmType = 4
+	TransactionValue_KVSQL    TransactionValue_VmType = 5
 )
 
 var TransactionValue_VmType_name = map[int32]string{

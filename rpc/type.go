@@ -2,6 +2,9 @@ package rpc
 
 import (
 	"fmt"
+	"github.com/hashicorp/go-uuid"
+	"github.com/meshplus/gosdk/account"
+	"github.com/meshplus/gosdk/common/hexutil"
 	"strconv"
 	"strings"
 )
@@ -22,6 +25,14 @@ const (
 	BalanceInsufficientCode   = -32002
 	SystemBusyCode            = -32006
 	DuplicateTransactionsCode = -32007
+
+	ALGOTYPE_SM2 = "sm2"
+	ALGOTYPE_EC  = "ecdsa"
+	ALGOTYPE_ED  = "ed25519"
+
+	NORMAL  = 0
+	FREEZE  = 1
+	ABANDON = 2
 )
 
 // NodeInfo is packaged return result of node
@@ -265,6 +276,7 @@ type TxReceipt struct {
 	Version         string
 	Valid           bool
 	ErrorMsg        string
+	GasUsed         int64
 }
 
 type BalanceAndAmount struct {
@@ -519,6 +531,13 @@ type SnapshotEvent struct {
 	BlockNumber uint64 `json:"blockNumber"`
 }
 
+// ArchiveResult used for return archive result, tell caller which step is processing
+type ArchiveResult struct {
+	FilterID string `json:"filterId"`
+	Status   string `json:"status"`
+	Reason   string `json:"reason"`
+}
+
 // ProposalRaw ProposalRaw
 type ProposalRaw struct {
 	ID        uint64      `json:"id,omitempty"`
@@ -586,17 +605,6 @@ func NewSystemError(e error) StdError {
 	}
 }
 
-// NewAsnycRequestError is used to construct StdError
-func NewAsnycRequestError(e error) StdError {
-	if e == nil {
-		return nil
-	}
-	return &RetError{
-		code:    AsnycRequestErrorCode,
-		message: e.Error(),
-	}
-}
-
 // NewRequestTimeoutError is used to construct StdError
 func NewRequestTimeoutError(e error) StdError {
 	if e == nil {
@@ -627,89 +635,6 @@ func NewHttpResponseError(code int, msg string) StdError {
 	}
 }
 
-// AsyncResult is packaged AsyncResult
-type AsyncResult struct {
-	resCh chan *TxReceipt
-	errCh chan StdError
-	res   *TxReceipt
-	err   StdError
-}
-
-// NewAsyncResult is used to construct AsyncResult
-func NewAsyncResult() AsyncResult {
-	return AsyncResult{
-		resCh: make(chan *TxReceipt, 1),
-		errCh: make(chan StdError, 1),
-	}
-}
-
-// SetResult is used to set AsycnResult result
-func (ar *AsyncResult) SetResult(txReceipt *TxReceipt) {
-	ar.resCh <- txReceipt
-}
-
-// SetError is used to set error of AsyncResult
-func (ar *AsyncResult) SetError(stdErr StdError) {
-	ar.errCh <- stdErr
-}
-
-// GetResult is used to get result from AsyncResult
-func (ar *AsyncResult) GetResult() (txReceipt *TxReceipt, err StdError) {
-	select {
-	case txReceipt, ok := <-ar.resCh:
-		if !ok {
-			break
-		}
-
-		close(ar.resCh)
-		close(ar.errCh)
-
-		ar.res, ar.err = txReceipt, nil
-
-		return txReceipt, nil
-	case err, ok := <-ar.errCh:
-		if !ok {
-			break
-		}
-
-		close(ar.resCh)
-		close(ar.errCh)
-
-		ar.res, ar.err = &TxReceipt{}, err
-
-		return &TxReceipt{}, err
-	}
-
-	return ar.res, ar.err
-}
-
-// SyncMethod Synchronization method
-type SyncMethod func(*Transaction) (*TxReceipt, StdError)
-
-// AsyncMethod Asynchronous method
-type AsyncMethod func(*Transaction) AsyncResult
-
-// Asyncify Asyncify the synchronization method
-func Asyncify(method SyncMethod) AsyncMethod {
-	return func(transaction *Transaction) AsyncResult {
-		asyncRes := NewAsyncResult()
-		go func(result AsyncResult) {
-			if txReceipt, stdErr := method(transaction); stdErr != nil {
-				result.SetError(stdErr)
-			} else {
-				result.SetResult(txReceipt)
-			}
-		}(asyncRes)
-		return asyncRes
-	}
-}
-
-// AsyncHandler async handler
-type AsyncHandler interface {
-	OnSuccess(receipt *TxReceipt)
-	OnFailure(error StdError)
-}
-
 // InspectorRule is the rule of api filter
 type InspectorRule struct {
 	// AllowAnyone determines whether the resources can be accessed freely by anyone
@@ -730,3 +655,103 @@ type InspectorRule struct {
 	// To is  the `to` address used to define resources of tx api
 	Method []string `json:"method" mapstructure:"method"`
 }
+
+type DIDPublicKey struct {
+	KeyType  string `json:"type,omitempty"`
+	KeyValue []byte `json:"key,omitempty"`
+}
+
+func GenDIDPublicKeyFromDIDKey(didKey *account.DIDKey) (*DIDPublicKey, error) {
+	if didKey.Key == nil {
+		return nil, fmt.Errorf("the key can't be nil")
+	}
+	var KeyType string
+	var KeyValue []byte
+	switch didKey.Key.(type) {
+	case *account.SM2Key:
+		KeyType = ALGOTYPE_SM2
+	case *account.ECDSAKey:
+		KeyType = ALGOTYPE_EC
+	case *account.ED25519Key:
+		KeyType = ALGOTYPE_ED
+	}
+	KeyValue, _ = didKey.PublicBytes()
+	return &DIDPublicKey{KeyType: KeyType, KeyValue: KeyValue}, nil
+}
+
+type DIDDocument struct {
+	DidAddress string                 `json:"didAddress,omitempty"`
+	State      int                    `json:"state,omitempty"`
+	PublicKey  *DIDPublicKey          `json:"publicKey,omitempty"`
+	Admins     []string               `json:"admins,omitempty"`
+	Extra      map[string]interface{} `json:"extra,omitempty"`
+}
+
+func NewDIDDocument(didAddress string, publicKey *DIDPublicKey, admins []string) *DIDDocument {
+	return &DIDDocument{
+		DidAddress: didAddress,
+		State:      NORMAL,
+		PublicKey:  publicKey,
+		Admins:     admins,
+	}
+}
+
+type DIDCredential struct {
+	ID             string `json:"id,omitempty"`
+	Type           string `json:"type,omitempty"`
+	Issuer         string `json:"issuer,omitempty"`
+	Holder         string `json:"holder,omitempty"`
+	IssuanceDate   int64  `json:"issuanceDate,omitempty"`
+	ExpirationDate int64  `json:"expirationDate,omitempty"`
+	SignType       string `json:"signType,omitempty"`
+	Signature      string `json:"signature,omitempty"`
+	Subject        string `json:"subject,omitempty"`
+}
+
+func NewDIDCredential(ctype, issuer, holder, subject string, issuanceDate, expirationDate int64) *DIDCredential {
+	id, _ := uuid.GenerateUUID()
+	return &DIDCredential{
+		ID:             id,
+		Type:           ctype,
+		Issuer:         issuer,
+		Holder:         holder,
+		IssuanceDate:   issuanceDate,
+		ExpirationDate: expirationDate,
+		Subject:        subject,
+	}
+}
+
+func (credential *DIDCredential) needHashString() string {
+	res := "id=" + credential.ID +
+		"&type=" + credential.Type +
+		"&issuer=" + credential.Issuer +
+		"&holder=" + credential.Holder +
+		"&issuanceDate=" + hexutil.EncodeUint64(uint64(credential.IssuanceDate)) +
+		"&expirationData=" + hexutil.EncodeUint64(uint64(credential.ExpirationDate)) +
+		"&subject=" + credential.Subject +
+		"&signType=" + credential.SignType
+	return res
+}
+
+func (credential *DIDCredential) Sign(key interface{}) error {
+	hashStr := credential.needHashString()
+	_, isDIDAccount := key.(*account.DIDKey)
+	if isDIDAccount {
+		key = key.(*account.DIDKey).GetNormalKey()
+	}
+	switch key.(type) {
+	case account.SM2Key:
+		credential.SignType = ALGOTYPE_SM2
+	case account.ECDSAKey:
+		credential.SignType = ALGOTYPE_EC
+	case account.ED25519Key:
+		credential.SignType = ALGOTYPE_ED
+	default:
+		return fmt.Errorf("can't use other key type")
+	}
+	sig, _ := SignWithDID(key, hashStr, false, false, isDIDAccount)
+	credential.Signature = sig
+	return nil
+}
+
+//todo verify

@@ -7,13 +7,13 @@ import (
 	"github.com/meshplus/gosdk/account"
 	"io/ioutil"
 	"path/filepath"
+	"reflect"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/meshplus/gosdk/common"
-	"github.com/meshplus/gosdk/utils/scheduler"
 	"github.com/terasum/viper"
 )
 
@@ -46,6 +46,8 @@ const (
 	AUTH = "auth_"
 	// SIMULATE type
 	SIMULATE = "simulate_"
+	//DID type
+	DID = "did_"
 
 	DefaultNamespace          = "global"
 	DefaultResendTime         = 10
@@ -54,7 +56,7 @@ const (
 	DefaultSecondPollInterval = 1000
 	DefaultSecondPollTime     = 10
 	DefaultReConnectTime      = 10000
-	DefaultTxVersion          = "1.0"
+	DefaultTxVersion          = "3.0"
 )
 
 var (
@@ -63,14 +65,9 @@ var (
 	TxVersion = DefaultTxVersion
 )
 
-func setTxVersion(version string) {
-	TxVersion = version
-}
-
 // RPC represents rpc apis
 type RPC struct {
 	hrm                httpRequestManager
-	dispatcher         *scheduler.Dispatcher
 	namespace          string
 	resTime            int64
 	firstPollInterval  int64
@@ -79,6 +76,7 @@ type RPC struct {
 	secondPollTime     int64
 	reConnTime         int64
 	txVersion          string
+	chainID            string
 	im                 *inspectorManager
 }
 
@@ -99,6 +97,10 @@ func (rpc *RPC) String() string {
 	}
 	nodeString += "]"
 	return "\"namespace\":" + rpc.namespace + ", \"nodeUrl\":" + nodeString
+}
+
+func (rpc *RPC) GetChainID() string {
+	return rpc.chainID
 }
 
 // NewRPC get a RPC instance with default conf directory path "../conf"
@@ -148,21 +150,18 @@ func NewRPCWithPath(confRootPath string) *RPC {
 
 	secondPollTime := vip.GetInt64(common.PollingSecondPollingTimes)
 	logger.Debugf("[CONFIG]: %s = %v", common.PollingSecondPollingTimes, secondPollTime)
-
 	reConnTime := vip.GetInt64(common.ReConnectTime)
 	logger.Debugf("[CONFIG]: %s = %v", common.ReConnectTime, reConnTime)
 
+	version := vip.GetString(common.TxVersion)
+	logger.Debugf("[CONFIG]: %s = %v", common.TxVersion, version)
+
 	im := newInspectorManager(vip, confRootPath)
 
-	httpRequestManager := newHTTPRequestManager(vip, confRootPath)
-
-	// Start dispatcher for retry sendTx
-	dispatcher := scheduler.NewDispatcher(10)
-	dispatcher.Run()
+	httpRequestManager := newHTTPRequestManager(vip, confRootPath, version)
 
 	rpc := &RPC{
 		hrm:                *httpRequestManager,
-		dispatcher:         dispatcher,
 		namespace:          namespace,
 		resTime:            resTime,
 		firstPollInterval:  firstPollInterval,
@@ -184,12 +183,12 @@ func NewRPCWithPath(confRootPath string) *RPC {
 	//	logger.Info("set TxVersion to " + TxVersion)
 	txVersion, err := rpc.GetTxVersion()
 	if err != nil {
-		logger.Info("use default txVersion, for", err.Error())
-		txVersion = DefaultTxVersion
+		logger.Info("use config txVersion, for", err.Error())
+		txVersion = version
 	}
 	TxVersion = txVersion
-	rpc.txVersion = TxVersion
-
+	rpc.txVersion = txVersion
+	rpc.hrm.txVersion = txVersion
 	logger.Info("set TxVersion to " + TxVersion)
 	return rpc
 }
@@ -226,6 +225,8 @@ func newInspectorManager(vip *viper.Viper, confRootPath string) (im *inspectorMa
 		key, err = account.NewAccountSm2FromAccountJSON(string(data), "")
 	case "ecdsaPriv":
 		key, err = account.NewAccountFromPriv(string(data))
+	case "ecdsaPrivR1":
+		key, err = account.NewAccountR1FromPriv(string(data))
 	case "sm2Priv":
 		key, err = account.NewAccountSm2FromPriv(string(data))
 	default:
@@ -262,6 +263,11 @@ func DefaultRPC(nodes ...*Node) *RPC {
 func (rpc *RPC) Namespace(ns string) *RPC {
 	rpc.namespace = ns
 	return rpc
+}
+
+// Close close release goroutine and http connection
+func (rpc *RPC) Close() {
+	rpc.hrm.client.CloseIdleConnections()
 }
 
 // ResendTimes setter
@@ -442,6 +448,44 @@ func (rpc *RPC) callWithSpecificURL(method string, url string, params ...interfa
 	return resp.Result, nil
 }
 
+func (rpc *RPC) callByPolling(method string, params ...interface{}) (json.RawMessage, StdError) {
+	req := rpc.jsonRPC(method, params...)
+	for i := int64(0); i < rpc.resTime; i++ {
+		resp, err := rpc.callWithReqByPolling(req, rpc.firstPollTime, rpc.firstPollInterval)
+		if err != nil {
+			return nil, err
+		}
+		if resp != nil {
+			return resp, nil
+		}
+		resp, err = rpc.callWithReqByPolling(req, rpc.secondPollTime, rpc.secondPollInterval)
+		if err != nil {
+			return nil, err
+		}
+		if resp != nil {
+			return resp, nil
+		}
+	}
+	return nil, NewRequestTimeoutError(errors.New("request time out"))
+}
+
+func (rpc *RPC) callWithReqByPolling(req *JSONRequest, pollingTime int64, pollingInterval int64) (json.RawMessage, StdError) {
+	for j := int64(0); j < pollingTime; j++ {
+		resp, err := rpc.callWithReq(req)
+		if err != nil {
+			if err.Code() == BalanceInsufficientCode {
+				return nil, err
+			} else if err.Code() != DataNotExistCode && err.Code() != SystemBusyCode {
+				return nil, err
+			}
+			time.Sleep(time.Millisecond * time.Duration(pollingInterval))
+		} else {
+			return resp, nil
+		}
+	}
+	return nil, nil
+}
+
 // Call call and get tx receipt directly without polling
 func (rpc *RPC) Call(method string, param interface{}) (*TxReceipt, StdError) {
 	data, err := rpc.call(method, param)
@@ -466,29 +510,9 @@ func (rpc *RPC) CallByPolling(method string, param interface{}, isPrivateTx bool
 	)
 	// if simulate is false, transaction need to resend
 	req = rpc.jsonRPC(method, param)
-
 	for i := int64(0); i < rpc.resTime; i++ {
 		if data, err = rpc.callWithReq(req); err != nil {
-			if err.Code() == DuplicateTransactionsCode {
-				// -32007: 交易重复
-				s := strings.Split(string(data), " ")
-				if len(s) >= 3 {
-					hash = s[2]
-				}
-				txReceipt, innErr, success := rpc.GetTxReceiptByPolling(hash, isPrivateTx)
-				err = innErr
-				if success {
-					return txReceipt, err
-				}
-				continue
-			} else if err.Code() == GetResponseErrorCode || err.Code() == SystemErrorCode {
-				// resend
-			} else if err.Code() != SystemBusyCode && err.Code() != DataNotExistCode {
-				// -9999: 获取响应失败
-				// -32001: 查询的数据不存在
-				// -32006: 系统繁忙
-				return nil, err
-			}
+			return nil, err
 		} else {
 			if sysErr = json.Unmarshal(data, &hash); sysErr != nil {
 				return nil, NewSystemError(sysErr)
@@ -501,7 +525,7 @@ func (rpc *RPC) CallByPolling(method string, param interface{}, isPrivateTx bool
 			continue
 		}
 		//if code is -9999 -32001 and -32006, we should sleep then resend
-		time.Sleep(time.Millisecond * time.Duration(rpc.firstPollInterval+rpc.secondPollInterval))
+		//time.Sleep(time.Millisecond * time.Duration(rpc.firstPollInterval+rpc.secondPollInterval))
 	}
 	return nil, NewRequestTimeoutError(errors.New("request time out"))
 }
@@ -619,6 +643,17 @@ func (rpc *RPC) DeleteNodeNVP(hash string) (bool, StdError) {
 	return true, nil
 }
 
+// DisconnectNodeVP  NVP断开与VP节点的链接
+func (rpc *RPC) DisconnectNodeVP(hash string) (bool, StdError) {
+	method := NODE + "disconnectVP"
+	param := newMapParam("nodehash", hash)
+	_, err := rpc.call(method, param.Serialize())
+	if err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
 // GetNodeStates 获取节点状态信息
 func (rpc *RPC) GetNodeStates() ([]NodeStateInfo, StdError) {
 	method := NODE + "getNodeStates"
@@ -634,12 +669,40 @@ func (rpc *RPC) GetNodeStates() ([]NodeStateInfo, StdError) {
 	return list, nil
 }
 
+func (rpc *RPC) ReplaceNodeCerts(hostname string) (string, StdError) {
+	chash, cerr := rpc.GetNodeHash()
+	if cerr != nil {
+		return "", cerr
+	}
+	data, err := rpc.GetNodes()
+	if err != nil {
+		return "", err
+	}
+	for _, val := range data {
+		if val.HostName == hostname {
+			if !reflect.DeepEqual("\""+val.Hash+"\"", chash) {
+				return "", NewSystemError(fmt.Errorf("the binding node's hostname is %s", val.HostName))
+			}
+			break
+		}
+	}
+	method := NODE + "replaceCerts"
+	res, cerr := rpc.call(method)
+	if cerr != nil {
+		return "", cerr
+	}
+	var hash string
+	if sysErr := json.Unmarshal(res, &hash); sysErr != nil {
+		return "", NewSystemError(sysErr)
+	}
+	return hash, nil
+}
+
 /*---------------------------------- block ----------------------------------*/
 
 // GetLatestBlock returns information about the latest block
 func (rpc *RPC) GetLatestBlock() (*Block, StdError) {
 	method := BLOCK + "latestBlock"
-
 	data, stdErr := rpc.call(method)
 	if stdErr != nil {
 		return nil, stdErr
@@ -1594,8 +1657,10 @@ func (rpc *RPC) GetTxReceipt(txHash string, isPrivateTx bool) (*TxReceipt, StdEr
 	return &txr, nil
 }
 
+// Deprecated
 // SendTx 同步发送交易
 func (rpc *RPC) SendTx(transaction *Transaction) (*TxReceipt, StdError) {
+	transaction.txVersion = rpc.txVersion
 	method := TRANSACTION + "sendTransaction"
 	param := transaction.Serialize()
 	if transaction.simulate {
@@ -1604,18 +1669,16 @@ func (rpc *RPC) SendTx(transaction *Transaction) (*TxReceipt, StdError) {
 	return rpc.CallByPolling(method, param, transaction.isPrivateTx)
 }
 
-// SendTxAsync 异步发送交易
-func (rpc *RPC) SendTxAsync(transaction *Transaction, handler AsyncHandler) bool {
-	job := func() {
-		asyncResult := Asyncify(rpc.SendTx)(transaction)
-		res, err := asyncResult.GetResult()
-		if err != nil {
-			handler.OnFailure(err)
-		} else {
-			handler.OnSuccess(res)
-		}
+// SignAndSendTx 同步发送交易并签名
+func (rpc *RPC) SignAndSendTx(transaction *Transaction, key interface{}) (*TxReceipt, StdError) {
+	transaction.txVersion = rpc.txVersion
+	transaction.Sign(key)
+	method := TRANSACTION + "sendTransaction"
+	param := transaction.Serialize()
+	if transaction.simulate {
+		return rpc.Call(method, param)
 	}
-	return rpc.dispatcher.AddJob(job)
+	return rpc.CallByPolling(method, param, transaction.isPrivateTx)
 }
 
 /*---------------------------------- contract ----------------------------------*/
@@ -1638,6 +1701,7 @@ func isTxVersion10(txVersion string) bool {
 	return strings.Compare(txVersion, "1.0") == 0
 }
 
+// Deprecated
 // DeployContract Deploy contract rpc
 func (rpc *RPC) DeployContract(transaction *Transaction) (*TxReceipt, StdError) {
 	var method string
@@ -1658,20 +1722,65 @@ func (rpc *RPC) DeployContract(transaction *Transaction) (*TxReceipt, StdError) 
 	return rpc.CallByPolling(method, param, transaction.isPrivateTx)
 }
 
-// DeployContractAsync deploy contract async rpc
-func (rpc *RPC) DeployContractAsync(transaction *Transaction, handler AsyncHandler) bool {
-	job := func() {
-		asyncResult := Asyncify(rpc.DeployContract)(transaction)
-		res, err := asyncResult.GetResult()
-		if err != nil {
-			handler.OnFailure(err)
+// SignAndDeployContract Deploy contract rpc
+func (rpc *RPC) SignAndDeployContract(transaction *Transaction, key interface{}) (*TxReceipt, StdError) {
+	transaction.txVersion = rpc.txVersion
+	transaction.Sign(key)
+	var method string
+	if transaction.isPrivateTx {
+		method = CONTRACT + "deployPrivateContract"
+	} else {
+		if !isTxVersion10(transaction.getTxVersion()) && transaction.simulate {
+			method = SIMULATE + "deployContract"
 		} else {
-			handler.OnSuccess(res)
+			method = CONTRACT + "deployContract"
 		}
 	}
-	return rpc.dispatcher.AddJob(job)
+	transaction.isDeploy = true
+	param := transaction.Serialize()
+	if transaction.simulate {
+		return rpc.Call(method, param)
+	}
+	return rpc.CallByPolling(method, param, transaction.isPrivateTx)
 }
 
+// SignAndInvokeContract invoke contract rpc
+func (rpc *RPC) SignAndInvokeContract(transaction *Transaction, key interface{}) (*TxReceipt, StdError) {
+	transaction.txVersion = rpc.txVersion
+	transaction.Sign(key)
+	var method string
+	if transaction.isPrivateTx {
+		method = CONTRACT + "invokePrivateContract"
+	} else {
+		if !isTxVersion10(transaction.getTxVersion()) && transaction.simulate {
+			method = SIMULATE + "invokeContract"
+		} else {
+			method = CONTRACT + "invokeContract"
+		}
+	}
+	transaction.isInvoke = true
+	param := transaction.Serialize()
+
+	if transaction.simulate {
+		return rpc.Call(method, param)
+	}
+	return rpc.CallByPolling(method, param, transaction.isPrivateTx)
+}
+
+// SignAndInvokeContractCombineReturns invoke contract rpc, return *TxReceipt and *TransactionInfo
+func (rpc *RPC) SignAndInvokeContractCombineReturns(transaction *Transaction, key interface{}) (*TxReceipt, *TransactionInfo, StdError) {
+	txReceipt, err := rpc.SignAndInvokeContract(transaction, key)
+	if err != nil {
+		return nil, nil, err
+	}
+	txInfo, err := rpc.GetTransactionByHash(txReceipt.TxHash)
+	if err != nil {
+		return nil, nil, err
+	}
+	return txReceipt, txInfo, nil
+}
+
+// Deprecated
 // InvokeContract invoke contract rpc
 func (rpc *RPC) InvokeContract(transaction *Transaction) (*TxReceipt, StdError) {
 	var method string
@@ -1693,8 +1802,23 @@ func (rpc *RPC) InvokeContract(transaction *Transaction) (*TxReceipt, StdError) 
 	return rpc.CallByPolling(method, param, transaction.isPrivateTx)
 }
 
+// Deprecated
 // ManageContractByVote manage contract by vote rpc
 func (rpc *RPC) ManageContractByVote(transaction *Transaction) (*TxReceipt, StdError) {
+	method := CONTRACT + "manageContractByVote"
+	transaction.isInvoke = true
+	param := transaction.Serialize()
+
+	if transaction.simulate {
+		return rpc.Call(method, param)
+	}
+	return rpc.CallByPolling(method, param, transaction.isPrivateTx)
+}
+
+// ManageContractByVote manage contract by vote rpc
+func (rpc *RPC) SignAndManageContractByVote(transaction *Transaction, key interface{}) (*TxReceipt, StdError) {
+	transaction.txVersion = rpc.txVersion
+	transaction.Sign(key)
 	method := CONTRACT + "manageContractByVote"
 	transaction.isInvoke = true
 	param := transaction.Serialize()
@@ -1778,20 +1902,7 @@ func (rpc *RPC) CheckHmValue(rawValue []uint64, encryValue []string, invalidHmVa
 	return validResutl, nil
 }
 
-// InvokeContractAsync invoke contract async rpc
-func (rpc *RPC) InvokeContractAsync(transaction *Transaction, handler AsyncHandler) bool {
-	job := func() {
-		asyncResult := Asyncify(rpc.InvokeContract)(transaction)
-		res, err := asyncResult.GetResult()
-		if err != nil {
-			handler.OnFailure(err)
-		} else {
-			handler.OnSuccess(res)
-		}
-	}
-	return rpc.dispatcher.AddJob(job)
-}
-
+// Deprecated
 // MaintainContract 管理合约 opcode
 // 1.升级合约
 // 2.冻结
@@ -1811,18 +1922,25 @@ func (rpc *RPC) MaintainContract(transaction *Transaction) (*TxReceipt, StdError
 	return rpc.CallByPolling(method, param, transaction.isPrivateTx)
 }
 
-// MaintainContractAsync maintain contract async
-func (rpc *RPC) MaintainContractAsync(transaction *Transaction, handler AsyncHandler) bool {
-	job := func() {
-		asyncResult := Asyncify(rpc.MaintainContract)(transaction)
-		res, err := asyncResult.GetResult()
-		if err != nil {
-			handler.OnFailure(err)
-		} else {
-			handler.OnSuccess(res)
-		}
+// SignAndMaintainContract 管理合约 opcode
+// 1.升级合约
+// 2.冻结
+// 3.解冻
+func (rpc *RPC) SignAndMaintainContract(transaction *Transaction, key interface{}) (*TxReceipt, StdError) {
+	transaction.txVersion = rpc.txVersion
+	transaction.Sign(key)
+	var method string
+	if !isTxVersion10(transaction.getTxVersion()) && transaction.simulate {
+		method = SIMULATE + "maintainContract"
+	} else {
+		method = CONTRACT + "maintainContract"
 	}
-	return rpc.dispatcher.AddJob(job)
+	transaction.isMaintain = true
+	param := transaction.Serialize()
+	if transaction.simulate {
+		return rpc.Call(method, param)
+	}
+	return rpc.CallByPolling(method, param, transaction.isPrivateTx)
 }
 
 // GetContractStatus 获取合约状态
@@ -2186,7 +2304,6 @@ func (rpc *RPC) ArchiveNoPredict(filterID string) (string, StdError) {
 }
 
 // Restore restores datas that have been archived for given snapshot. If successful, returns true.
-// Deprecated: we will remove it later, use ipc command [restore <namespace> <filterId> <shouldSync>] instead.
 func (rpc *RPC) Restore(filterID string, sync bool) (bool, StdError) {
 	method := ARCHIVE + "restore"
 
@@ -2251,6 +2368,24 @@ func (rpc *RPC) QueryArchive(filterID string) (string, StdError) {
 
 	if sysErr := json.Unmarshal(data, &result); sysErr != nil {
 		return "", NewSystemError(sysErr)
+	}
+
+	return result, nil
+}
+
+// QueryLatestArchive query latest archive job status.
+func (rpc *RPC) QueryLatestArchive() (*ArchiveResult, StdError) {
+	method := ARCHIVE + "queryLatestArchive"
+
+	data, stdErr := rpc.call(method)
+	if stdErr != nil {
+		return nil, stdErr
+	}
+
+	var result *ArchiveResult
+
+	if sysErr := json.Unmarshal(data, &result); sysErr != nil {
+		return nil, NewSystemError(sysErr)
 	}
 
 	return result, nil
@@ -2333,7 +2468,7 @@ func (rpc *RPC) GetAccountsByRole(role string) ([]string, StdError) {
 	return accounts, nil
 }
 
-// GetAccountStatus 获取用户状态
+// GetContractStatus 获取合约状态
 func (rpc *RPC) GetAccountStatus(address string) (string, StdError) {
 	method := ACCOUNT + "getStatus"
 	param := address
@@ -2364,7 +2499,7 @@ func (rpc *RPC) ListenContract(srcCode, addr string) (string, StdError) {
 
 func (rpc *RPC) GetProposal() (*ProposalRaw, StdError) {
 	method := CONFIG + "getProposal"
-	data, err := rpc.call(method)
+	data, err := rpc.callByPolling(method)
 	if err != nil {
 		return nil, err
 	}
@@ -2580,4 +2715,103 @@ func (rpc *RPC) GetRulesFromNode() ([]*InspectorRule, StdError) {
 		return nil, NewSystemError(sysErr)
 	}
 	return rules, nil
+}
+
+/*---------------------------------- did ----------------------------------*/
+
+func (rpc *RPC) SendDIDTransaction(transaction *Transaction, key interface{}) (*TxReceipt, StdError) {
+	transaction.txVersion = rpc.txVersion
+	transaction.Sign(key)
+	method := DID + "sendDIDTransaction"
+	param := transaction.Serialize()
+	if transaction.simulate {
+		return rpc.Call(method, param)
+	}
+	return rpc.CallByPolling(method, param, transaction.isPrivateTx)
+}
+
+func (rpc *RPC) GetNodeChainID() (string, StdError) {
+	method := DID + "getChainID"
+	data, err := rpc.call(method)
+	if err != nil {
+		return "", err
+	}
+	var chainID string
+	if sysErr := json.Unmarshal(data, &chainID); sysErr != nil {
+		return "", NewSystemError(sysErr)
+	}
+	return chainID, nil
+}
+
+func (rpc *RPC) GetDIDDocument(didAddress string) (*DIDDocument, StdError) {
+	method := DID + "getDIDDocument"
+	param := map[string]interface{}{
+		"didAddress": didAddress,
+	}
+	data, err := rpc.call(method, param)
+	if err != nil {
+		return nil, err
+	}
+	var didDocument *DIDDocument
+	if sysErr := json.Unmarshal(data, &didDocument); sysErr != nil {
+		return nil, NewSystemError(sysErr)
+	}
+	return didDocument, nil
+}
+
+func (rpc *RPC) GetCredentialPrimaryMessage(id string) (*DIDCredential, StdError) {
+	method := DID + "getCredentialPrimaryMessage"
+	param := map[string]interface{}{
+		"id": id,
+	}
+	data, err := rpc.call(method, param)
+	if err != nil {
+		return nil, err
+	}
+	var didCredential *DIDCredential
+	if sysErr := json.Unmarshal(data, &didCredential); sysErr != nil {
+		return nil, NewSystemError(sysErr)
+	}
+	return didCredential, nil
+}
+
+func (rpc *RPC) CheckCredentialValid(id string) (bool, StdError) {
+	method := DID + "checkCredentialValid"
+	param := map[string]interface{}{
+		"id": id,
+	}
+	data, err := rpc.call(method, param)
+	if err != nil {
+		return false, err
+	}
+	var isok bool
+	if sysErr := json.Unmarshal(data, &isok); sysErr != nil {
+		return false, NewSystemError(sysErr)
+	}
+	return isok, nil
+}
+
+func (rpc *RPC) CheckCredentialAbandoned(id string) (bool, StdError) {
+	method := DID + "checkCredentialAbandoned"
+	param := map[string]interface{}{
+		"id": id,
+	}
+	data, err := rpc.call(method, param)
+	if err != nil {
+		return false, err
+	}
+	var isok bool
+	if sysErr := json.Unmarshal(data, &isok); sysErr != nil {
+		return false, NewSystemError(sysErr)
+	}
+	return isok, nil
+}
+
+func (rpc *RPC) SetLocalChainID() error {
+	chainID, err := rpc.GetNodeChainID()
+	if err != nil {
+		return err
+	}
+	rpc.chainID = chainID
+	return nil
 }

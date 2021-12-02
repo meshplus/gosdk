@@ -6,6 +6,7 @@ import (
 )
 
 func Test_InvalidTransactionRecords(t *testing.T) {
+	t.Skip("Test_InvalidTransactionRecords")
 	itr := new(InvalidTransactionRecords)
 	_ = itr.String()
 	itr.Descriptor()
@@ -34,6 +35,7 @@ func Test_InvalidTransactionRecords(t *testing.T) {
 }
 
 func Test_Transaction(t *testing.T) {
+	t.Skip("Test_Transaction")
 	itr := new(Transaction)
 	_ = itr.String()
 	itr.Descriptor()
@@ -70,6 +72,7 @@ func Test_Transaction(t *testing.T) {
 }
 
 func Test_TransactionWrapper(t *testing.T) {
+	t.Skip("Test_TransactionWrapper")
 	itr := new(TransactionWrapper)
 	_ = itr.String()
 	itr.Descriptor()
@@ -107,6 +110,7 @@ func Test_TransactionWrapper(t *testing.T) {
 }
 
 func Test_InvokeArgsNonHash(t *testing.T) {
+	t.Skip("Test_InvokeArgsNonHash")
 	itr := new(InvokeArgs)
 	_ = itr.String()
 	itr.Descriptor()

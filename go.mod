@@ -9,12 +9,14 @@ require (
 	github.com/gogo/protobuf v1.3.1
 	github.com/golang/protobuf v1.3.3
 	github.com/gorilla/websocket v1.4.0
+	github.com/hashicorp/go-uuid v1.0.2
 	github.com/hashicorp/hcl v1.0.0 // indirect
 	github.com/json-iterator/go v1.1.9
 	github.com/magiconair/properties v1.8.0
-	github.com/meshplus/crypto-gm v0.1.0
-	github.com/meshplus/crypto-standard v0.1.1
-	github.com/meshplus/flato-msp-cert v0.1.0
+	github.com/meshplus/crypto v0.0.8
+	github.com/meshplus/crypto-gm v0.1.1
+	github.com/meshplus/crypto-standard v0.1.2
+	github.com/meshplus/flato-msp-cert v0.1.1
 	github.com/mholt/archiver v0.0.0-20180417220235-e4ef56d48eb0
 	github.com/mitchellh/mapstructure v1.2.2
 	github.com/nwaples/rardecode v0.0.0-20171029023500-e06696f847ae // indirect
@@ -27,7 +29,7 @@ require (
 	github.com/spf13/jwalterweatherman v1.1.0 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
 	github.com/streadway/amqp v0.0.0-20180528204448-e5adc2ada8b8
-	github.com/stretchr/testify v1.6.1
+	github.com/stretchr/testify v1.7.0
 	github.com/syndtr/goleveldb v1.0.0
 	github.com/terasum/viper v0.0.0-20170802085632-7507f719f06e
 	github.com/ulikunitz/xz v0.5.4 // indirect

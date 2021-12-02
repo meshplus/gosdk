@@ -1,14 +1,14 @@
 package account
 
 import (
-	"crypto"
 	"fmt"
+	"github.com/meshplus/gosdk/common"
+	"github.com/meshplus/crypto"
 	gm "github.com/meshplus/crypto-gm"
 	"github.com/meshplus/crypto-standard/asym"
 	"github.com/meshplus/crypto-standard/ed25519"
 	"github.com/meshplus/crypto-standard/hash"
 	"github.com/meshplus/flato-msp-cert/primitives/x509"
-	"github.com/meshplus/gosdk/common"
 )
 
 //Key account key
@@ -51,14 +51,7 @@ func (key *PKIKey) GetNormalKey() Key {
 }
 
 func (key *PKIKey) PublicBytes() ([]byte, error) {
-	switch pk := key.cert.PublicKey.(type) {
-	case *asym.ECDSAPublicKey:
-		return pk.Bytes()
-	case *gm.SM2PublicKey:
-		return pk.Bytes()
-	default:
-		return nil, fmt.Errorf("unknown key type or nil")
-	}
+	return key.sk.Bytes()
 }
 
 func (key *PKIKey) PrivateBytes() ([]byte, error) {
@@ -77,9 +70,21 @@ type ECDSAKey struct {
 }
 
 func (key *ECDSAKey) GetAddress() common.Address {
+	if key.AlgorithmType() == asym.AlgoP256R1 {
+		bs, err := key.ECDSAPublicKey.Bytes()
+		if err != nil {
+			return common.Address{}
+		}
+		h, _ := hash.NewHasher(hash.KECCAK_256).Hash(bs)
+		return common.BytesToAddress(h[12:])
+	}
+
 	bs, err := key.ECDSAPublicKey.Bytes()
 	if err != nil {
 		return common.Address{}
+	}
+	if key.AlgorithmType() == asym.AlgoP256K1Recover {
+		return common.BytesToAddress(bs)
 	}
 	h, _ := hash.NewHasher(hash.KECCAK_256).Hash(bs[1:])
 	return common.BytesToAddress(h[12:])
@@ -130,4 +135,30 @@ func (key *ED25519Key) PublicBytes() ([]byte, error) {
 
 func (key *ED25519Key) PrivateBytes() ([]byte, error) {
 	return key.Bytes()
+}
+
+//DIDKey used as didAccount
+type DIDKey struct {
+	Key     Key
+	address string
+}
+
+//GetNormalKey return thr real key to sign
+func (didKey *DIDKey) GetNormalKey() Key {
+	return didKey.Key
+}
+
+//GetAddress return didAddress
+func (didKey *DIDKey) GetAddress() string {
+	return didKey.address
+}
+
+//PublicBytes return publicKey
+func (didKey *DIDKey) PublicBytes() ([]byte, error) {
+	return didKey.Key.PublicBytes()
+}
+
+//PrivateBytes return privateKey
+func (didKey *DIDKey) PrivateBytes() ([]byte, error) {
+	return didKey.PrivateBytes()
 }
