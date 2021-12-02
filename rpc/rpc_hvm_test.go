@@ -109,7 +109,7 @@ func TestEncode(t *testing.T) {
 }
 
 func TestRPC_Hvm(t *testing.T) {
-	//t.Skip()
+	t.Skip()
 	deployJar, err := DecompressFromJar("../hvmtestfile/fibonacci/fibonacci-1.0-fibonacci.jar")
 	if err != nil {
 		t.Error(err)
