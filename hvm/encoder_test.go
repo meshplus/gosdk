@@ -126,6 +126,7 @@ func TestRPC_Encoder(t *testing.T) {
 }
 
 func TestRPC_MethodAbi(t *testing.T) {
+	t.Skip()
 	logger := common.GetLogger("main")
 	methodInvokeJar := "../hvmtestfile/methodInvoke/share-2.0.jar"
 	methodInvokeAbi := "../hvmtestfile/methodInvoke/hvm1.abi"

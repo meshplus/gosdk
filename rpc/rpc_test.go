@@ -950,7 +950,7 @@ func TestRPC_GetTxByTimeWithLimit(t *testing.T) {
 }
 
 func TestRPC_GetDiscardTransactionsByTime(t *testing.T) {
-	//t.Skip()
+	t.Skip()
 	infos, err := rpc.GetDiscardTransactionsByTime(1, uint64(time.Now().UnixNano()))
 	if err != nil {
 		t.Error(err)
