@@ -157,141 +157,177 @@ func DesDecrypt(crypted, key []byte) ([]byte, error) {
 	return out, nil
 }
 
+func generateECDSAPrivateKey(acType string, isDiD bool) (*asym.ECDSAPrivateKey, error) {
+	opt := asym.AlgoP256K1Recover
+	if isDiD {
+		opt = asym.AlgoP256K1
+	}
+	if len(acType) == 5 && acType[4] == '1' {
+		opt = asym.AlgoP256R1
+	}
+	return asym.GenerateKey(opt)
+}
+
 // NewAccountJson generate account json by account type
 func NewAccountJson(acType, password string) (string, error) {
-	accountJson := new(accountJSON)
-	var privateKey []byte
-
-	if strings.HasPrefix(acType, "0x0") {
-		key, err := asym.GenerateKey(asym.AlgoP256K1Recover)
-		if len(acType) == 5 && acType[4] == '1' {
-			key, err = asym.GenerateKey(asym.AlgoP256R1)
-		}
-		if err != nil {
-			return "", err
-		}
-		switch acType {
-		case ECKDF2, ECKDF2R1:
-			return "", errors.New("not support KDF2 now")
-		case ECDES, ECDESR1:
-			privateKey, err = DesEncrypt(math.PaddedBigBytes(key.D, 32), []byte(password))
-			if err != nil {
-				return "", err
-			}
-		case ECRAW, ECRAWR1:
-			privateKey = math.PaddedBigBytes(key.D, 32)
-		case ECAES, ECAESR1:
-			aes := new(inter.AES)
-			reader := bytes.NewReader(AtPadding([]byte(password), 32)[:16])
-			privateKey, err = aes.Encrypt(AtPadding([]byte(password), 32), math.PaddedBigBytes(key.D, 32), reader)
-			if err != nil {
-				return "", err
-			}
-			privateKey = privateKey[16:]
-		case EC3DES, EC3DESR1:
-			privateKey, err = inter.TripleDesEncrypt8(math.PaddedBigBytes(key.D, 32), AtPadding([]byte(password), 24))
-			if err != nil {
-				return "", err
-			}
-		default:
-			return "", errors.New("not support crypt type " + acType)
-		}
-		accountJson.Algo = acType
-		accountJson.Version = V4
-		//if acType == ECDES {
-		//	accountJson.Version = V1
-		//}
-		accountJson.Address, accountJson.PublicKey = getAddressAndPublic(&ECDSAKey{key})
-		accountJson.PrivateKey = common.Bytes2Hex(privateKey)
-	} else if strings.HasPrefix(acType, "0x1") {
-		key, err := gm.GenerateSM2Key()
-		if err != nil {
-			return "", err
-		}
-		tempKey := common.LeftPadBytes(key.K[:], 32)
-		var privateKey []byte
-		switch acType {
-		case SMSM4:
-			accountJson.Algo = SMSM4
-			privateKey, err = gm.Sm4EncryptCBC(AtPadding([]byte(password), 16), tempKey, rand.Reader)
-			if err != nil {
-				return "", err
-			}
-		case SMDES:
-			accountJson.Algo = SMDES
-			privateKey, err = DesEncrypt(tempKey, []byte(password))
-			if err != nil {
-				return "", err
-			}
-		case SMRAW:
-			accountJson.Algo = SMRAW
-			privateKey = tempKey
-		case SMAES:
-			accountJson.Algo = SMAES
-			aes := new(inter.AES)
-			reader := bytes.NewReader(AtPadding([]byte(password), 32)[:16])
-			privateKey, err = aes.Encrypt(AtPadding([]byte(password), 32), tempKey, reader)
-			if err != nil {
-				return "", err
-			}
-			privateKey = privateKey[16:]
-		case SM3DES:
-			accountJson.Algo = SM3DES
-			privateKey, err = inter.TripleDesEncrypt8(tempKey, AtPadding([]byte(password), 24))
-			if err != nil {
-				return "", err
-			}
-		default:
-			return "", errors.New("not support crypt type " + acType)
-		}
-		accountJson.Version = V4
-		accountJson.PrivateKey = common.Bytes2Hex(privateKey)
-		accountJson.Address, accountJson.PublicKey = getAddressAndPublic(&SM2Key{key})
-	} else if strings.HasPrefix(acType, "0x2") {
-		var err error
-		vk, pk := ed25519.GenerateKey(rand.Reader)
-		if vk == nil || pk == nil {
-			return "", errors.New("generate ed25519 key failed")
-		}
-		tempKey := vk[:]
-		switch acType {
-		case ED25519DES:
-			accountJson.Algo = ED25519DES
-			privateKey, err = DesEncrypt(tempKey, []byte(password))
-			if err != nil {
-				return "", err
-			}
-		case ED25519RAW:
-			accountJson.Algo = ED25519RAW
-			privateKey = tempKey
-		case ED25519AES:
-			accountJson.Algo = ED25519AES
-			aes := new(inter.AES)
-			reader := bytes.NewReader(AtPadding([]byte(password), 32)[:16])
-			privateKey, err = aes.Encrypt(AtPadding([]byte(password), 32), tempKey, reader)
-			if err != nil {
-				return "", err
-			}
-			privateKey = privateKey[16:]
-		case ED255193DES:
-			accountJson.Algo = ED255193DES
-			privateKey, err = inter.TripleDesEncrypt8(tempKey, AtPadding([]byte(password), 24))
-			if err != nil {
-				return "", err
-			}
-		default:
-			return "", errors.New("not support crypt type " + acType)
-		}
-		accountJson.Version = V4
-		accountJson.Address, accountJson.PublicKey = getAddressAndPublic(&ED25519Key{vk})
-		accountJson.PrivateKey = common.Bytes2Hex(privateKey)
+	ac, err := generateAccountJSON(acType, password, false)
+	if err != nil {
+		return "", err
 	}
-
-	jsonBytes, err := json.Marshal(accountJson)
+	jsonBytes, err := json.Marshal(ac)
 	if err != nil {
 		return "", err
 	}
 	return string(jsonBytes), nil
+}
+
+// NewDIDAccountJson generate account json by account type
+func NewDIDAccountJson(acType, password string) (string, error) {
+	ac, err := generateAccountJSON(acType, password, true)
+	if err != nil {
+		return "", err
+	}
+	jsonBytes, err := json.Marshal(ac)
+	if err != nil {
+		return "", err
+	}
+	return string(jsonBytes), nil
+}
+
+func generateAccountJSON(acType, password string, isDiD bool) (*accountJSON, error) {
+	if strings.HasPrefix(acType, "0x0") {
+		return generateECAccountJson(acType, password, isDiD)
+	} else if strings.HasPrefix(acType, "0x1") {
+		return generateSMAccountJson(acType, password)
+	} else if strings.HasPrefix(acType, "0x2") {
+		return generateEDAccountJson(acType, password)
+	}
+	return new(accountJSON), nil
+}
+
+func generateECAccountJson(acType, password string, isDiD bool) (*accountJSON, error) {
+	accountJson := new(accountJSON)
+	var privateKey []byte
+	key, err := generateECDSAPrivateKey(acType, isDiD)
+	if err != nil {
+		return nil, err
+	}
+	switch acType {
+	case ECKDF2, ECKDF2R1:
+		return nil, errors.New("not support KDF2 now")
+	case ECDES, ECDESR1:
+		privateKey, err = DesEncrypt(math.PaddedBigBytes(key.D, 32), []byte(password))
+		if err != nil {
+			return nil, err
+		}
+	case ECRAW, ECRAWR1:
+		privateKey = math.PaddedBigBytes(key.D, 32)
+	case ECAES, ECAESR1:
+		aes := new(inter.AES)
+		reader := bytes.NewReader(AtPadding([]byte(password), 32)[:16])
+		privateKey, err = aes.Encrypt(AtPadding([]byte(password), 32), math.PaddedBigBytes(key.D, 32), reader)
+		if err != nil {
+			return nil, err
+		}
+		privateKey = privateKey[16:]
+	case EC3DES, EC3DESR1:
+		privateKey, err = inter.TripleDesEncrypt8(math.PaddedBigBytes(key.D, 32), AtPadding([]byte(password), 24))
+		if err != nil {
+			return nil, err
+		}
+	default:
+		return nil, errors.New("not support crypt type " + acType)
+	}
+	accountJson.Algo = acType
+	accountJson.Version = V4
+	accountJson.Address, accountJson.PublicKey = getAddressAndPublic(&ECDSAKey{key})
+	accountJson.PrivateKey = common.Bytes2Hex(privateKey)
+	return accountJson, nil
+}
+
+func generateSMAccountJson(acType, password string) (*accountJSON, error) {
+	accountJson := new(accountJSON)
+	var privateKey []byte
+	key, err := gm.GenerateSM2Key()
+	if err != nil {
+		return nil, err
+	}
+	tempKey := common.LeftPadBytes(key.K[:], 32)
+	switch acType {
+	case SMSM4:
+		privateKey, err = gm.Sm4EncryptCBC(AtPadding([]byte(password), 16), tempKey, rand.Reader)
+		if err != nil {
+			return nil, err
+		}
+	case SMDES:
+		privateKey, err = DesEncrypt(tempKey, []byte(password))
+		if err != nil {
+			return nil, err
+		}
+	case SMRAW:
+		privateKey = tempKey
+	case SMAES:
+		aes := new(inter.AES)
+		reader := bytes.NewReader(AtPadding([]byte(password), 32)[:16])
+		privateKey, err = aes.Encrypt(AtPadding([]byte(password), 32), tempKey, reader)
+		if err != nil {
+			return nil, err
+		}
+		privateKey = privateKey[16:]
+	case SM3DES:
+		privateKey, err = inter.TripleDesEncrypt8(tempKey, AtPadding([]byte(password), 24))
+		if err != nil {
+			return nil, err
+		}
+	default:
+		return nil, errors.New("not support crypt type " + acType)
+	}
+	accountJson.Algo = acType
+	accountJson.Version = V4
+	accountJson.PrivateKey = common.Bytes2Hex(privateKey)
+	accountJson.Address, accountJson.PublicKey = getAddressAndPublic(&SM2Key{key})
+	return accountJson, nil
+}
+
+func generateEDAccountJson(acType, password string) (*accountJSON, error) {
+	accountJson := new(accountJSON)
+	var privateKey []byte
+	var err error
+	vk, pk := ed25519.GenerateKey(rand.Reader)
+	if vk == nil || pk == nil {
+		return nil, errors.New("generate ed25519 key failed")
+	}
+	tempKey := vk[:]
+	switch acType {
+	case ED25519DES:
+		privateKey, err = DesEncrypt(tempKey, []byte(password))
+		if err != nil {
+			return nil, err
+		}
+	case ED25519RAW:
+		privateKey = tempKey
+	case ED25519AES:
+		aes := new(inter.AES)
+		reader := bytes.NewReader(AtPadding([]byte(password), 32)[:16])
+		privateKey, err = aes.Encrypt(AtPadding([]byte(password), 32), tempKey, reader)
+		if err != nil {
+			return nil, err
+		}
+		privateKey = privateKey[16:]
+	case ED255193DES:
+		accountJson.Algo = ED255193DES
+		privateKey, err = inter.TripleDesEncrypt8(tempKey, AtPadding([]byte(password), 24))
+		if err != nil {
+			return nil, err
+		}
+	default:
+		return nil, errors.New("not support crypt type " + acType)
+	}
+	accountJson.Algo = acType
+	accountJson.Version = V4
+	accountJson.Address, accountJson.PublicKey = getAddressAndPublic(&ED25519Key{vk})
+	accountJson.PrivateKey = common.Bytes2Hex(privateKey)
+	return accountJson, nil
 }
 
 // NewAccountJsonFromPfx create account json using pfx cert
@@ -321,6 +357,15 @@ func NewAccountJsonFromPfx(password string, pfx []byte) (string, error) {
 
 // GenKeyFromAccountJson generate ecdsa.Key or gm.Key by account type
 func GenKeyFromAccountJson(accountJson, password string) (key interface{}, err error) {
+	return genKeyFromAccountJson(accountJson, password, false)
+}
+
+// GenDIDKeyFromAccountJson generate ecdsa.Key or gm.Key by account type
+func GenDIDKeyFromAccountJson(accountJson, password string) (key interface{}, err error) {
+	return genKeyFromAccountJson(accountJson, password, true)
+}
+
+func genKeyFromAccountJson(accountJson, password string, isDID bool) (key interface{}, err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			key = nil
@@ -328,7 +373,11 @@ func GenKeyFromAccountJson(accountJson, password string) (key interface{}, err e
 		}
 	}()
 
-	accountJson, err = ParseAccountJson(accountJson, password)
+	if isDID {
+		accountJson, err = ParseDIDAccountJson(accountJson, password)
+	} else {
+		accountJson, err = ParseAccountJson(accountJson, password)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -348,7 +397,11 @@ func GenKeyFromAccountJson(accountJson, password string) (key interface{}, err e
 		var ecdsaKey *ECDSAKey
 		var err error
 		if len(account.Algo) == 4 {
-			ecdsaKey, err = NewAccountFromPriv(common.Bytes2Hex(priv))
+			if isDID {
+				ecdsaKey, err = NewDIDAccountFromPriv(common.Bytes2Hex(priv))
+			} else {
+				ecdsaKey, err = NewAccountFromPriv(common.Bytes2Hex(priv))
+			}
 		} else {
 			ecdsaKey, err = NewAccountR1FromPriv(common.Bytes2Hex(priv))
 		}
@@ -382,6 +435,14 @@ func GenKeyFromAccountJson(accountJson, password string) (key interface{}, err e
 }
 
 func ParseAccountJson(accountJson, password string) (newAccountJson string, err error) {
+	return parseAccountJson(accountJson, password, false)
+}
+
+func ParseDIDAccountJson(accountJson, password string) (newAccountJson string, err error) {
+	return parseAccountJson(accountJson, password, true)
+}
+
+func parseAccountJson(accountJson, password string, isDiD bool) (newAccountJson string, err error) {
 	account := make(map[string]interface{})
 	err = json.Unmarshal([]byte(accountJson), &account)
 	if err != nil {
@@ -438,7 +499,11 @@ func ParseAccountJson(accountJson, password string) (newAccountJson string, err 
 			return "", err
 		}
 		if len(algo) == 4 {
-			key, err = NewAccountFromPriv(common.Bytes2Hex(decryptedPriv))
+			if isDiD {
+				key, err = NewDIDAccountFromPriv(common.Bytes2Hex(decryptedPriv))
+			} else {
+				key, err = NewAccountFromPriv(common.Bytes2Hex(decryptedPriv))
+			}
 		} else {
 			key, err = NewAccountR1FromPriv(common.Bytes2Hex(decryptedPriv))
 		}
@@ -556,12 +621,23 @@ func decryptPriv(encrypted, algo, password string) (priv []byte, err error) {
 }
 
 // NewAccount create account using ecdsa
-// if password is empty, the encrypted field will be private key
+// if password is empty, the encrypted field will be private key.
+// if want to create did account , use NewAccountDID instead.
 func NewAccount(password string) (string, error) {
 	if password != "" {
 		return NewAccountJson(ECDES, password)
 	} else {
 		return NewAccountJson(ECRAW, password)
+	}
+}
+
+// NewAccountDID create account using ecdsa
+// if password is empty, the encrypted field will be private key.
+func NewAccountDID(password string) (string, error) {
+	if password != "" {
+		return NewDIDAccountJson(ECDES, password)
+	} else {
+		return NewDIDAccountJson(ECRAW, password)
 	}
 }
 
@@ -581,6 +657,18 @@ func NewAccountFromPriv(priv string) (*ECDSAKey, error) {
 	}
 	key := new(asym.ECDSAPrivateKey)
 	err := key.FromBytes(common.Hex2Bytes(priv), asym.AlgoP256K1Recover)
+	if err != nil {
+		return nil, errors.New("create ecdsa key failed")
+	}
+	return &ECDSAKey{key}, nil
+}
+
+func NewDIDAccountFromPriv(priv string) (*ECDSAKey, error) {
+	if priv == "" {
+		return nil, errors.New("private key is nil")
+	}
+	key := new(asym.ECDSAPrivateKey)
+	err := key.FromBytes(common.Hex2Bytes(priv), asym.AlgoP256K1)
 	if err != nil {
 		return nil, errors.New("create ecdsa key failed")
 	}
@@ -718,7 +806,7 @@ func NewAccountR1FromPriv(priv string) (*ECDSAKey, error) {
 	}
 	key := new(asym.ECDSAPrivateKey)
 	err := key.FromBytes(common.Hex2Bytes(priv), asym.AlgoP256R1)
-	if err == nil {
+	if err != nil {
 		return nil, errors.New("create ecdsa key failed")
 	}
 	return &ECDSAKey{key}, nil

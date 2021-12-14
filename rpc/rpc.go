@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"github.com/meshplus/gosdk/account"
+	"github.com/meshplus/gosdk/common"
+	"github.com/meshplus/gosdk/common/types"
 	"io/ioutil"
 	"path/filepath"
 	"reflect"
@@ -13,7 +15,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/meshplus/gosdk/common"
 	"github.com/terasum/viper"
 )
 
@@ -48,6 +49,8 @@ const (
 	SIMULATE = "simulate_"
 	//DID type
 	DID = "did_"
+	// PROOF type
+	PROOF = "proof_"
 
 	DefaultNamespace          = "global"
 	DefaultResendTime         = 10
@@ -622,6 +625,7 @@ func (rpc *RPC) GetNodeHashByID(id int) (string, StdError) {
 }
 
 // DeleteNodeVP 删除VP节点
+// Deprecated
 func (rpc *RPC) DeleteNodeVP(hash string) (bool, StdError) {
 	method := NODE + "deleteVP"
 	param := newMapParam("nodehash", hash)
@@ -723,9 +727,9 @@ func (rpc *RPC) GetLatestBlock() (*Block, StdError) {
 	return block, nil
 }
 
-// Deprecated
 // GetBlocks returns a list of blocks from start block number to end block number
 // isPlain indicates if the result includes transaction information. if false, includes, otherwise not.
+// Deprecated
 func (rpc *RPC) GetBlocks(from, to uint64, isPlain bool) ([]*Block, StdError) {
 	if from == 0 || to == 0 || to < from {
 		return nil, NewSystemError(errors.New("to and from should be non-zero integer and to should no more than from"))
@@ -815,6 +819,7 @@ func (rpc *RPC) GetBlockByHash(blockHash string, isPlain bool) (*Block, StdError
 }
 
 // GetBatchBlocksByHash returns a list of blocks by a list of specific block hash.
+// Deprecated
 func (rpc *RPC) GetBatchBlocksByHash(blockHashes []string, isPlain bool) ([]*Block, StdError) {
 	method := BLOCK + "getBatchBlocksByHash"
 
@@ -875,6 +880,7 @@ func (rpc *RPC) GetBlockByNumber(blockNum interface{}, isPlain bool) (*Block, St
 }
 
 // GetBatchBlocksByNumber returns a list of blocks by a list of specific block number.
+// Deprecated
 func (rpc *RPC) GetBatchBlocksByNumber(blockNums []uint64, isPlain bool) ([]*Block, StdError) {
 	method := BLOCK + "getBatchBlocksByNumber"
 
@@ -941,6 +947,7 @@ func (rpc *RPC) GetAvgGenTimeByBlockNum(from, to uint64) (int64, StdError) {
 // GetBlocksByTime returns the number of blocks, starting block and ending block
 // at specific time periods.
 // startTime and endTime are timestamps
+// Deprecated
 func (rpc *RPC) GetBlocksByTime(startTime, endTime uint64) (*BlockInterval, StdError) {
 	if endTime < startTime {
 		return nil, NewSystemError(errors.New("startTime should less than endTime"))
@@ -1052,8 +1059,8 @@ func (rpc *RPC) GetChainHeight() (string, StdError) {
 
 /*---------------------------------- transaction ----------------------------------*/
 
-// Deprecated
 // GetTransactionsByBlkNum 根据区块号查询范围内的交易
+// Deprecated: use GetTransactionsByBlkNumWithLimit instead
 func (rpc *RPC) GetTransactionsByBlkNum(start, end uint64) ([]TransactionInfo, StdError) {
 	qtr := &QueryTxRange{
 		From: start,
@@ -1104,7 +1111,97 @@ func (rpc *RPC) GetTransactionsByBlkNumWithLimit(start, end uint64, metadata *Me
 	return pageResult, nil
 }
 
-// GetDiscardTx 获取所有非法交易
+func (rpc *RPC) GetInvalidTransactionsByBlkNumWithLimit(start, end uint64, metadata *Metadata) (*PageResult, StdError) {
+	qtr := &QueryTxRange{
+		From:     start,
+		To:       end,
+		metadata: metadata,
+	}
+	method := TRANSACTION + "getInvalidTransactionsWithLimit"
+	param := qtr.Serialize()
+	data, err := rpc.call(method, param)
+	if err != nil {
+		return nil, err
+	}
+
+	var pageResult *PageResult
+	sysErr := json.Unmarshal(data, &pageResult)
+	if sysErr != nil {
+		return nil, NewSystemError(sysErr)
+	}
+
+	return pageResult, nil
+}
+
+// GetInvalidTransactionsByBlkNum 根据区块号查询区块内的非法交易
+func (rpc *RPC) GetInvalidTransactionsByBlkNum(blkNum uint64) ([]TransactionInfo, StdError) {
+	method := TRANSACTION + "getInvalidTransactionsByBlockNumber"
+	data, err := rpc.call(method, blkNum)
+	if err != nil {
+		return nil, err
+	}
+
+	var txsRaw []TransactionRaw
+	if sysErr := json.Unmarshal(data, &txsRaw); sysErr != nil {
+		return nil, NewSystemError(sysErr)
+	}
+
+	txs := make([]TransactionInfo, 0, len(txsRaw))
+	for _, txRaw := range txsRaw {
+		t, err := txRaw.ToTransaction()
+		if err != nil {
+			return nil, err
+		}
+		txs = append(txs, *t)
+	}
+	return txs, nil
+}
+
+// GetInvalidTransactionsByBlkHash 根据区块哈希查询区块内的非法交易
+func (rpc *RPC) GetInvalidTransactionsByBlkHash(blkHash string) ([]TransactionInfo, StdError) {
+	method := TRANSACTION + "getInvalidTransactionsByBlockHash"
+	data, err := rpc.call(method, blkHash)
+	if err != nil {
+		return nil, err
+	}
+
+	var txsRaw []TransactionRaw
+	if sysErr := json.Unmarshal(data, &txsRaw); sysErr != nil {
+		return nil, NewSystemError(sysErr)
+	}
+
+	txs := make([]TransactionInfo, 0, len(txsRaw))
+	for _, txRaw := range txsRaw {
+		t, err := txRaw.ToTransaction()
+		if err != nil {
+			return nil, err
+		}
+		txs = append(txs, *t)
+	}
+	return txs, nil
+}
+
+// GetInvalidTxCount 获取链上非法交易数
+func (rpc *RPC) GetInvalidTxCount() (uint64, StdError) {
+	method := TRANSACTION + "getInvalidTransactionsCount"
+	data, err := rpc.call(method)
+	if err != nil {
+		return 0, err
+	}
+
+	var hexCount string
+	if sysError := json.Unmarshal(data, &hexCount); sysError != nil {
+		return 0, NewSystemError(err)
+	}
+	count, sysErr := strconv.ParseUint(hexCount, 0, 64)
+	if sysErr != nil {
+		return 0, NewSystemError(sysErr)
+	}
+	return count, nil
+}
+
+// GetDiscardTx 获取所有旧版本（flato-1.1.0及以前）的非法交易
+// Deprecated
 func (rpc *RPC) GetDiscardTx() ([]TransactionInfo, StdError) {
 	method := TRANSACTION + "getDiscardTransactions"
 	data, err := rpc.call(method)
@@ -1145,6 +1242,8 @@ func (rpc *RPC) GetTransactionByHash(txHash string) (*TransactionInfo, StdError)
 	return tx.ToTransaction()
 }
 
+// GetPrivateTransactionByHash 查询隐私交易
+// Deprecated
 func (rpc *RPC) GetPrivateTransactionByHash(txHash string) (*TransactionInfo, StdError) {
 	method := TRANSACTION + "getPrivateTransactionByHash"
 	param := txHash
@@ -1161,6 +1260,7 @@ func (rpc *RPC) GetPrivateTransactionByHash(txHash string) (*TransactionInfo, St
 }
 
 // GetBatchTxByHash 批量获取交易
+// Deprecated
 func (rpc *RPC) GetBatchTxByHash(hashes []string) ([]TransactionInfo, StdError) {
 	mp := newMapParam("hashes", hashes)
 	method := TRANSACTION + "getBatchTransactions"
@@ -1238,6 +1338,7 @@ func (rpc *RPC) GetTxAvgTimeByBlockNumber(from, to uint64) (uint64, StdError) {
 }
 
 // GetBatchReceipt 批量获取回执
+// Deprecated
 func (rpc *RPC) GetBatchReceipt(hashes []string) ([]TxReceipt, StdError) {
 	mp := newMapParam("hashes", hashes)
 	method := TRANSACTION + "getBatchReceipt"
@@ -1255,6 +1356,7 @@ func (rpc *RPC) GetBatchReceipt(hashes []string) ([]TxReceipt, StdError) {
 }
 
 // GetTransactionsCountByTime 查询指定时间区间内的交易数量
+// Deprecated
 func (rpc *RPC) GetTransactionsCountByTime(startTime, endTime uint64) (uint64, StdError) {
 	mp := newMapParam("startTime", startTime).addKV("endTime", endTime)
 	method := TRANSACTION + "getTransactionsCountByTime"
@@ -1351,6 +1453,7 @@ func (rpc *RPC) GetTxCount() (*TransactionsCount, StdError) {
 }
 
 // GetTxCountByContractAddr 查询区块间指定合约的交易量 txExtra过滤是否带有额外字段
+// Deprecated
 func (rpc *RPC) GetTxCountByContractAddr(from, to uint64, address string, txExtra bool) (*TransactionsCountByContract, StdError) {
 	mp := newMapParam("from", from).addKV("to", to).addKV("address", address).addKV("txExtra", txExtra)
 	method := TRANSACTION + "getTransactionsCountByContractAddr"
@@ -1372,6 +1475,7 @@ func (rpc *RPC) GetTxCountByContractAddr(from, to uint64, address string, txExtr
 }
 
 // GetTxCountByContractName 查询区块间指定合约的交易量 txExtra过滤是否带有额外字段
+// Deprecated
 func (rpc *RPC) GetTxCountByContractName(from, to uint64, name string, txExtra bool) (*TransactionsCountByContract, StdError) {
 	mp := newMapParam("from", from).addKV("to", to).addKV("name", name).addKV("txExtra", txExtra)
 	method := TRANSACTION + "getTransactionsCountByContractName"
@@ -1393,6 +1497,7 @@ func (rpc *RPC) GetTxCountByContractName(from, to uint64, name string, txExtra b
 }
 
 // GetTransactionsCountByMethodID 查询区块区间交易数量（by method ID）
+// Deprecated
 func (rpc *RPC) GetTransactionsCountByMethodID(from, to uint64, address string, methodID string) (*TransactionsCountByContract, StdError) {
 	mp := newMapParam("from", from).addKV("to", to).addKV("address", address).addKV("methodID", methodID)
 	method := TRANSACTION + "getTransactionsCountByMethodID"
@@ -1434,8 +1539,8 @@ func (rpc *RPC) GetTransactionsCountByMethodIDAndContractName(from, to uint64, n
 	return count, nil
 }
 
-// Deprecated
 // GetTxByTime 根据范围时间戳查询交易信息
+// Deprecated : use GetTxByTimeWithLimit instead
 func (rpc *RPC) GetTxByTime(start, end uint64) ([]TransactionInfo, StdError) {
 	mp := newMapParam("startTime", start).addKV("endTime", end)
 	method := TRANSACTION + "getTransactionsByTime"
@@ -1521,7 +1626,8 @@ func (rpc *RPC) getTxByTimeWithLimit(param interface{}) (*PageTxs, StdError) {
 	return pageResult, nil
 }
 
-// GetDiscardTransactionsByTime 查询指定时间区间内的非法交易
+// GetDiscardTransactionsByTime 查询指定时间区间内的旧版本（flato-1.1.0及以前）非法交易
+// Deprecated
 func (rpc *RPC) GetDiscardTransactionsByTime(start, end uint64) ([]TransactionInfo, StdError) {
 	mp := newMapParam("startTime", start).addKV("endTime", end)
 	method := TRANSACTION + "getDiscardTransactionsByTime"
@@ -1548,6 +1654,7 @@ func (rpc *RPC) GetDiscardTransactionsByTime(start, end uint64) ([]TransactionIn
 }
 
 // GetNextPageTxs 获取下一页的交易
+// Deprecated
 func (rpc *RPC) GetNextPageTxs(blkNumber, txIndex, minBlkNumber, maxBlkNumber, separated, pageSize uint64, containCurrent bool, contractAddr string) ([]TransactionInfo, StdError) {
 	method := TRANSACTION + "getNextPageTransactions"
 	param := &TransactionPageArg{
@@ -1564,6 +1671,7 @@ func (rpc *RPC) GetNextPageTxs(blkNumber, txIndex, minBlkNumber, maxBlkNumber, s
 }
 
 // GetNextPageTxsByName 获取下一页的交易
+// Deprecated
 func (rpc *RPC) GetNextPageTxsByName(blkNumber, txIndex, minBlkNumber, maxBlkNumber, separated, pageSize uint64, containCurrent bool, contractName string) ([]TransactionInfo, StdError) {
 	method := TRANSACTION + "getNextPageTransactions"
 	param := &TransactionPageArg{
@@ -1580,6 +1688,7 @@ func (rpc *RPC) GetNextPageTxsByName(blkNumber, txIndex, minBlkNumber, maxBlkNum
 }
 
 // GetPrevPageTxs 获取上一页的交易
+// Deprecated
 func (rpc *RPC) GetPrevPageTxs(blkNumber, txIndex, minBlkNumber, maxBlkNumber, separated, pageSize uint64, containCurrent bool, contractAddr string) ([]TransactionInfo, StdError) {
 	method := TRANSACTION + "getPrevPageTransactions"
 	param := &TransactionPageArg{
@@ -1595,7 +1704,8 @@ func (rpc *RPC) GetPrevPageTxs(blkNumber, txIndex, minBlkNumber, maxBlkNumber, s
 	return rpc.getPageTxs(method, param)
 }
 
-// GetPrevPageTxs 获取上一页的交易
+// GetPrevPageTxsByName 获取上一页的交易
+// Deprecated
 func (rpc *RPC) GetPrevPageTxsByName(blkNumber, txIndex, minBlkNumber, maxBlkNumber, separated, pageSize uint64, containCurrent bool, contractName string) ([]TransactionInfo, StdError) {
 	method := TRANSACTION + "getPrevPageTransactions"
 	param := &TransactionPageArg{
@@ -1657,8 +1767,28 @@ func (rpc *RPC) GetTxReceipt(txHash string, isPrivateTx bool) (*TxReceipt, StdEr
 	return &txr, nil
 }
 
-// Deprecated
+// GetTxConfirmedReceipt 通过交易hash获取产生了checkpoint之后的交易回执
+// 参数txHash应该是"0x...."的形式
+func (rpc *RPC) GetTxConfirmedReceipt(txHash string) (*TxReceipt, StdError) {
+	var method string
+	txHash = chPrefix(txHash)
+	method = TRANSACTION + "getConfirmedTransactionReceipt"
+	param := txHash
+	data, err := rpc.call(method, param)
+	if err != nil {
+		return nil, err
+	}
+
+	var txr TxReceipt
+	if sysErr := json.Unmarshal(data, &txr); sysErr != nil {
+		return nil, NewSystemError(sysErr)
+	}
+	txr.PrivTxHash = txHash
+	return &txr, nil
+}
+
 // SendTx 同步发送交易
+// Deprecated: use SignAndSendTx instead
 func (rpc *RPC) SendTx(transaction *Transaction) (*TxReceipt, StdError) {
 	transaction.txVersion = rpc.txVersion
 	method := TRANSACTION + "sendTransaction"
@@ -1701,8 +1831,8 @@ func isTxVersion10(txVersion string) bool {
 	return strings.Compare(txVersion, "1.0") == 0
 }
 
-// Deprecated
 // DeployContract Deploy contract rpc
+// Deprecated: use SignAndDeployContract instead
 func (rpc *RPC) DeployContract(transaction *Transaction) (*TxReceipt, StdError) {
 	var method string
 	if transaction.isPrivateTx {
@@ -1780,8 +1910,8 @@ func (rpc *RPC) SignAndInvokeContractCombineReturns(transaction *Transaction, ke
 	return txReceipt, txInfo, nil
 }
 
-// Deprecated
 // InvokeContract invoke contract rpc
+// Deprecated
 func (rpc *RPC) InvokeContract(transaction *Transaction) (*TxReceipt, StdError) {
 	var method string
 	if transaction.isPrivateTx {
@@ -1802,8 +1932,8 @@ func (rpc *RPC) InvokeContract(transaction *Transaction) (*TxReceipt, StdError) 
 	return rpc.CallByPolling(method, param, transaction.isPrivateTx)
 }
 
-// Deprecated
 // ManageContractByVote manage contract by vote rpc
+// Deprecated: use SignAndManageContractByVote instead
 func (rpc *RPC) ManageContractByVote(transaction *Transaction) (*TxReceipt, StdError) {
 	method := CONTRACT + "manageContractByVote"
 	transaction.isInvoke = true
@@ -1815,7 +1945,7 @@ func (rpc *RPC) ManageContractByVote(transaction *Transaction) (*TxReceipt, StdE
 	return rpc.CallByPolling(method, param, transaction.isPrivateTx)
 }
 
-// ManageContractByVote manage contract by vote rpc
+// SignAndManageContractByVote manage contract by vote rpc
 func (rpc *RPC) SignAndManageContractByVote(transaction *Transaction, key interface{}) (*TxReceipt, StdError) {
 	transaction.txVersion = rpc.txVersion
 	transaction.Sign(key)
@@ -1867,6 +1997,7 @@ func (rpc *RPC) GetContractCountByAddr(accountAddress string) (uint64, StdError)
 }
 
 // EncryptoMessage 获取同态加密之后的账户余额以及转账金额
+// Deprecated
 func (rpc *RPC) EncryptoMessage(balance, amount uint64, invalidHmValue string) (*BalanceAndAmount, StdError) {
 	mp := newMapParam("balance", balance).addKV("amount", amount).addKV("invalidHmValue", invalidHmValue)
 	method := CONTRACT + "encryptoMessage"
@@ -1885,6 +2016,7 @@ func (rpc *RPC) EncryptoMessage(balance, amount uint64, invalidHmValue string) (
 }
 
 // CheckHmValue 获取收款方对所有未验证同态交易的验证结果
+// Deprecated
 func (rpc *RPC) CheckHmValue(rawValue []uint64, encryValue []string, invalidHmValue string) (*ValidResult, StdError) {
 	mp := newMapParam("rawValue", rawValue).addKV("encryValue", encryValue).addKV("invalidHmValue", invalidHmValue)
 	method := CONTRACT + "checkHmValue"
@@ -1902,11 +2034,11 @@ func (rpc *RPC) CheckHmValue(rawValue []uint64, encryValue []string, invalidHmVa
 	return validResutl, nil
 }
 
-// Deprecated
 // MaintainContract 管理合约 opcode
 // 1.升级合约
 // 2.冻结
 // 3.解冻
+// Deprecated use SignAndMaintainContract instead
 func (rpc *RPC) MaintainContract(transaction *Transaction) (*TxReceipt, StdError) {
 	var method string
 	if !isTxVersion10(transaction.getTxVersion()) && transaction.simulate {
@@ -2160,6 +2292,7 @@ func (rpc *RPC) GetMqClient() *MqClient {
 // Snapshot makes the snapshot for given the future block number or current the latest block number.
 // It returns the snapshot id for the client to query.
 // blockHeight can use `latest`, means make snapshot now
+// Deprecated
 func (rpc *RPC) Snapshot(blockHeight interface{}) (string, StdError) {
 	method := ARCHIVE + "snapshot"
 
@@ -2179,6 +2312,7 @@ func (rpc *RPC) Snapshot(blockHeight interface{}) (string, StdError) {
 
 // QuerySnapshotExist checks if the given snapshot existed, so you can confirm that
 // the last step Archive.Snapshot is successful.
+// Deprecated
 func (rpc *RPC) QuerySnapshotExist(filterID string) (bool, StdError) {
 	method := ARCHIVE + "querySnapshotExist"
 
@@ -2198,6 +2332,7 @@ func (rpc *RPC) QuerySnapshotExist(filterID string) (bool, StdError) {
 
 // CheckSnapshot will check that the snapshot is correct. If correct, returns true.
 // Otherwise, returns false.
+// Deprecated
 func (rpc *RPC) CheckSnapshot(filterID string) (bool, StdError) {
 	method := ARCHIVE + "checkSnapshot"
 
@@ -2216,6 +2351,7 @@ func (rpc *RPC) CheckSnapshot(filterID string) (bool, StdError) {
 }
 
 // DeleteSnapshot delete snapshot by id
+// Deprecated
 func (rpc *RPC) DeleteSnapshot(filterID string) (bool, StdError) {
 	method := ARCHIVE + "deleteSnapshot"
 
@@ -2251,6 +2387,7 @@ func (rpc *RPC) ListSnapshot() (Manifests, StdError) {
 }
 
 // ReadSnapshot returns the snapshot information for the given snapshot ID.
+// Deprecated
 func (rpc *RPC) ReadSnapshot(filterID string) (*Manifest, StdError) {
 	method := ARCHIVE + "readSnapshot"
 
@@ -2268,6 +2405,7 @@ func (rpc *RPC) ReadSnapshot(filterID string) (*Manifest, StdError) {
 }
 
 // Archive will archive data of the given snapshot. If successful, returns true.
+// Deprecated: use ArchiveNoPredict instead
 func (rpc *RPC) Archive(filterID string, sync bool) (bool, StdError) {
 	method := ARCHIVE + "archive"
 
@@ -2286,10 +2424,29 @@ func (rpc *RPC) Archive(filterID string, sync bool) (bool, StdError) {
 }
 
 // ArchiveNoPredict used for archive to specific committed block-number
-func (rpc *RPC) ArchiveNoPredict(filterID string) (string, StdError) {
+// Deprecated: use ArchiveNoPredictForBlockNumber instead
+func (rpc *RPC) ArchiveNoPredict(filterId string) (string, StdError) {
 	method := ARCHIVE + "archiveNoPredict"
 
-	data, stdErr := rpc.call(method, filterID)
+	data, stdErr := rpc.call(method, filterId)
+	if stdErr != nil {
+		return "", stdErr
+	}
+
+	var result string
+
+	if sysErr := json.Unmarshal(data, &result); sysErr != nil {
+		return "", NewSystemError(sysErr)
+	}
+
+	return result, nil
+}
+
+// ArchiveNoPredictForBlockNumber used for archive to specific committed block-number
+func (rpc *RPC) ArchiveNoPredictForBlockNumber(blockNumber uint64) (string, StdError) {
+	method := ARCHIVE + "archiveNoPredict"
+
+	data, stdErr := rpc.call(method, blockNumber)
 	if stdErr != nil {
 		return "", stdErr
 	}
@@ -2304,6 +2461,7 @@ func (rpc *RPC) ArchiveNoPredict(filterID string) (string, StdError) {
 }
 
 // Restore restores datas that have been archived for given snapshot. If successful, returns true.
+// Deprecated
 func (rpc *RPC) Restore(filterID string, sync bool) (bool, StdError) {
 	method := ARCHIVE + "restore"
 
@@ -2321,6 +2479,7 @@ func (rpc *RPC) Restore(filterID string, sync bool) (bool, StdError) {
 }
 
 // RestoreAll restores all datas that have been archived. If successful, returns true.
+// Deprecated
 func (rpc *RPC) RestoreAll(sync bool) (bool, StdError) {
 	method := ARCHIVE + "restoreAll"
 
@@ -2392,6 +2551,7 @@ func (rpc *RPC) QueryLatestArchive() (*ArchiveResult, StdError) {
 }
 
 // Pending returns all pending snapshot requests in ascend sort.
+// Deprecated
 func (rpc *RPC) Pending() ([]SnapshotEvent, StdError) {
 	method := ARCHIVE + "pending"
 
@@ -2408,6 +2568,33 @@ func (rpc *RPC) Pending() ([]SnapshotEvent, StdError) {
 	return result, nil
 }
 
+/*---------------------------------- proof ----------------------------------*/
+
+// GetAccountProof query proofPath of given account.
+func (rpc *RPC) GetAccountProof(account string) (*AccountProofPath, StdError) {
+	account = chPrefix(account)
+	method := PROOF + "getAccountProof"
+	param := account
+	data, err := rpc.call(method, param)
+	if err != nil {
+		return nil, err
+	}
+
+	var res AccountProofPath
+	if sysErr := json.Unmarshal(data, &res); sysErr != nil {
+		return nil, NewSystemError(sysErr)
+	}
+
+	return &res, nil
+}
+
+func Validate(account string, path *AccountProofPath) bool {
+	b := common.Hex2Bytes(account)
+
+	addr := common.BytesToAddress(b)
+	return types.Validate(addr.Bytes(), path.AccountProof)
+}
+
 /*---------------------------------- cert ----------------------------------*/
 
 // GetTCert 获取TCert
@@ -2419,6 +2606,7 @@ func (rpc *RPC) GetTCert(index uint) (string, StdError) {
 /*---------------------------------- account ----------------------------------*/
 
 // GetBalance 获取账户余额
+// Deprecated
 func (rpc *RPC) GetBalance(account string) (string, StdError) {
 	account = chPrefix(account)
 	method := ACCOUNT + "getBalance"
@@ -2468,7 +2656,7 @@ func (rpc *RPC) GetAccountsByRole(role string) ([]string, StdError) {
 	return accounts, nil
 }
 
-// GetContractStatus 获取合约状态
+// GetAccountStatus 获取账户状态
 func (rpc *RPC) GetAccountStatus(address string) (string, StdError) {
 	method := ACCOUNT + "getStatus"
 	param := address
@@ -2482,6 +2670,8 @@ func (rpc *RPC) GetAccountStatus(address string) (string, StdError) {
 
 /*---------------------------------- radar ----------------------------------*/
 
+// ListenContract
+// Deprecated
 func (rpc *RPC) ListenContract(srcCode, addr string) (string, StdError) {
 	method := RADAR + "registerContract"
 	param := newMapParam("source", srcCode)
