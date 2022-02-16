@@ -765,6 +765,71 @@ func TestRPC_GetTransactionsWithLimit(t *testing.T) {
 	fmt.Println(pageResult)
 }
 
+func TestRPC_GetInvalidTransactionsWithLimit(t *testing.T) {
+	t.Skip()
+	block, err := rpc.GetLatestBlock()
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
+	metadata := &Metadata{
+		PageSize: 1,
+		Bookmark: &Bookmark{
+			BlockNumber: 1,
+			TxIndex:     0,
+		},
+		Backward: false,
+	}
+
+	pageResult, err := rpc.GetInvalidTransactionsByBlkNumWithLimit(block.Number-1, block.Number, metadata)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	fmt.Println(pageResult)
+}
+
+func TestRPC_GetInvalidTxByBlockNumber(t *testing.T) {
+	t.Skip()
+	block, err := rpc.GetLatestBlock()
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	txInfos, err := rpc.GetInvalidTransactionsByBlkNum(block.Number)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	fmt.Println(txInfos)
+}
+
+func TestRPC_GetInvalidTxByBlockHash(t *testing.T) {
+	t.Skip()
+	block, err := rpc.GetLatestBlock()
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	txInfos, err := rpc.GetInvalidTransactionsByBlkHash(block.Hash)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	fmt.Println(txInfos)
+}
+
+func TestRPC_GetInvalidTxsCount(t *testing.T) {
+	t.Skip()
+	count, err := rpc.GetInvalidTxCount()
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	fmt.Println(count)
+}
+
 func TestRPC_GetDiscardTx(t *testing.T) {
 	txs, err := rpc.GetDiscardTx()
 	if err != nil {
@@ -1081,6 +1146,20 @@ func TestRPC_GetTxCount(t *testing.T) {
 		return
 	}
 	fmt.Println(txCount.Count)
+}
+
+/*---------------------------------- proof ----------------------------------*/
+
+func TestRPC_GetAccountProof(t *testing.T) {
+	t.Skip()
+	act := "e93b92f1da08f925bdee44e91e7768380ae83307"
+	res, err := rpc.GetAccountProof(act)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	
+	assert.True(t, Validate(act, res))
 }
 
 /*---------------------------------- cert ----------------------------------*/

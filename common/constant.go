@@ -62,3 +62,8 @@ const (
 const (
 	TxVersion = "tx.version"
 )
+
+const (
+	CurveNameBN254 = "bn254"
+	CurveNameSM9   = "sm9"
+)

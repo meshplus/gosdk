@@ -13,8 +13,8 @@ import (
 	"time"
 
 	"github.com/gogo/protobuf/proto"
-	"github.com/meshplus/gosdk/account"
 	"github.com/meshplus/crypto-standard/hash"
+	"github.com/meshplus/gosdk/account"
 
 	"github.com/meshplus/gosdk/abi"
 	"github.com/meshplus/gosdk/common"
@@ -56,6 +56,8 @@ const (
 	DIDCREDENTIAL_UPLOAD   = 206
 	DIDCREDENTIAL_DOWNLOAD = 207
 	DIDCREDENTIAL_ABANDON  = 208
+	DID_SETEXTRA           = 209
+	DID_GETEXTRA           = 210
 )
 
 type TxVersionInt int
@@ -73,6 +75,16 @@ const (
 	TxVersion28 TxVersionInt = 10
 	TxVersion29 TxVersionInt = 11
 	TxVersion30 TxVersionInt = 12
+	TxVersion31 TxVersionInt = 13
+	TxVersion32 TxVersionInt = 14
+	TxVersion33 TxVersionInt = 15
+	TxVersion34 TxVersionInt = 16
+	TxVersion35 TxVersionInt = 17
+	TxVersion36 TxVersionInt = 18
+	TxVersion37 TxVersionInt = 19
+	TxVersion38 TxVersionInt = 20
+	TxVersion39 TxVersionInt = 21
+	TxVersion40 TxVersionInt = 22
 )
 
 // Params interface
@@ -296,7 +308,7 @@ func (t *Transaction) InvokeSql(to string, payload []byte) *Transaction {
 	return t.Invoke(to, append([]byte{kvsql.RawSql}, payload...))
 }
 
-// Invoke add transaction isInvoke
+// InvokeByName invoke by name
 func (t *Transaction) InvokeByName(name string, payload []byte) *Transaction {
 	if string(payload[0:8]) == "fefffbce" {
 		t.payload = chPrefix("fefffbce" + common.Bytes2Hex(payload[8:]))
@@ -308,9 +320,9 @@ func (t *Transaction) InvokeByName(name string, payload []byte) *Transaction {
 	return t
 }
 
-// Deprecated
 // InvokeContract invoke evm contract by raw ABI, function name and arguments in string format
 // use abi.Encode instead
+// Deprecated
 func (t *Transaction) InvokeContract(to string, rawAbi string, funcName string, args ...string) *Transaction {
 
 	ABI, err := abi.JSON(strings.NewReader(rawAbi))
@@ -334,7 +346,7 @@ func (t *Transaction) InvokeContract(to string, rawAbi string, funcName string, 
 	return t
 }
 
-// Extra add extra into transaction
+// Extra set transaction extra
 func (t *Transaction) Extra(extra string) *Transaction {
 	t.extra = extra
 	t.hasExtra = true
@@ -385,6 +397,7 @@ func (t *Transaction) Register(document *DIDDocument) *Transaction {
 	t.opcode = DID_REGISTER
 	return t
 }
+
 func (t *Transaction) MaintainDID(to string, op int64) *Transaction {
 	if strings.HasPrefix(to, account.DIDPREFIX) {
 		to = hexutil.Encode([]byte(to))
@@ -394,6 +407,7 @@ func (t *Transaction) MaintainDID(to string, op int64) *Transaction {
 	t.opcode = op
 	return t
 }
+
 func (t *Transaction) UpdatePublicKey(to string, puKey *DIDPublicKey) *Transaction {
 	if strings.HasPrefix(to, account.DIDPREFIX) {
 		to = hexutil.Encode([]byte(to))
@@ -444,6 +458,37 @@ func (t *Transaction) DestroyCredential(credentialID string) *Transaction {
 	t.isDID = true
 	t.opcode = DIDCREDENTIAL_ABANDON
 	payload := common.Bytes2Hex([]byte(credentialID))
+	t.payload = chPrefix(payload)
+	return t
+}
+
+func (t *Transaction) DIDSetExtra(to, key, value string) *Transaction {
+	if strings.HasPrefix(to, account.DIDPREFIX) {
+		to = hexutil.Encode([]byte(to))
+	}
+	t.to = to
+	t.isDID = true
+	t.opcode = DID_SETEXTRA
+	kvMap := make(map[string]string)
+	kvMap["key"] = key
+	kvMap["value"] = value
+	res, _ := json.Marshal(kvMap)
+	payload := common.Bytes2Hex(res)
+	t.payload = chPrefix(payload)
+	return t
+}
+
+func (t *Transaction) DIDGetExtra(to, key string) *Transaction {
+	if strings.HasPrefix(to, account.DIDPREFIX) {
+		to = hexutil.Encode([]byte(to))
+	}
+	t.to = to
+	t.isDID = true
+	t.opcode = DID_GETEXTRA
+	kvMap := make(map[string]string)
+	kvMap["key"] = key
+	res, _ := json.Marshal(kvMap)
+	payload := common.Bytes2Hex(res)
 	t.payload = chPrefix(payload)
 	return t
 }

@@ -5,6 +5,7 @@ import (
 	"github.com/hashicorp/go-uuid"
 	"github.com/meshplus/gosdk/account"
 	"github.com/meshplus/gosdk/common/hexutil"
+	"github.com/meshplus/gosdk/common/types"
 	"strconv"
 	"strings"
 )
@@ -513,13 +514,18 @@ type QueueUnRegister struct {
 
 // Manifest represents all basic information of a snapshot.
 type Manifest struct {
-	Height     uint64 `json:"height"`
-	Genesis    uint64 `json:"genesis"`
-	BlockHash  string `json:"hash"`
-	FilterID   string `json:"filterId"`
-	MerkleRoot string `json:"merkleRoot"`
-	Date       string `json:"date"`
-	Namespace  string `json:"namespace"`
+	Height         uint64 `json:"height"`
+	Genesis        uint64 `json:"genesis"`
+	BlockHash      string `json:"hash"`
+	FilterID       string `json:"filterId"`
+	MerkleRoot     string `json:"merkleRoot"`
+	Namespace      string `json:"Namespace"`
+	TxCount        uint64 `json:"txCount"`
+	InvalidTxCount uint64 `json:"invalidTxCount,omitEmpty"`
+	Status         uint   `json:"status"`
+	DBVersion      string `json:"dbVersion"`
+	// use for hyperchain
+	Date string `json:"date"`
 }
 
 // Manifests Manifests
@@ -536,6 +542,11 @@ type ArchiveResult struct {
 	FilterID string `json:"filterId"`
 	Status   string `json:"status"`
 	Reason   string `json:"reason"`
+}
+
+// AccountProofPath represents the result returned by proof query.
+type AccountProofPath struct {
+	AccountProof types.ProofPath `json:"accountProof"`
 }
 
 // ProposalRaw ProposalRaw

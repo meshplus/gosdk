@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package protos;
+package bvm;
 
 message ProposalData{
     enum Status {
@@ -17,6 +17,8 @@ message ProposalData{
         CONFIG = 0;
         PERMISSION = 1;
         NODE = 2;
+        CNS = 3;
+        CONTRACT = 4;
     }
     uint64  id = 1;
     bytes  code = 2;
@@ -37,4 +39,5 @@ message ProposalData{
 message VoteInfo {
     string addr = 1;
     string txHash = 2;
+    uint32 weight = 3;
 }

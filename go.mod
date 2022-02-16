@@ -7,7 +7,7 @@ require (
 	github.com/davecgh/go-spew v1.1.1
 	github.com/dsnet/compress v0.0.0-20171208185109-cc9eb1d7ad76 // indirect
 	github.com/gogo/protobuf v1.3.1
-	github.com/golang/protobuf v1.3.3
+	github.com/golang/protobuf v1.4.2
 	github.com/gorilla/websocket v1.4.0
 	github.com/hashicorp/go-uuid v1.0.2
 	github.com/hashicorp/hcl v1.0.0 // indirect
@@ -33,6 +33,7 @@ require (
 	github.com/syndtr/goleveldb v1.0.0
 	github.com/terasum/viper v0.0.0-20170802085632-7507f719f06e
 	github.com/ulikunitz/xz v0.5.4 // indirect
+	google.golang.org/grpc v1.38.0
 	gopkg.in/check.v1 v1.0.0-20190902080502-41f04d3bba15
 )
 

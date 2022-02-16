@@ -2,13 +2,13 @@ package account
 
 import (
 	"fmt"
-	"github.com/meshplus/gosdk/common"
 	"github.com/meshplus/crypto"
 	gm "github.com/meshplus/crypto-gm"
 	"github.com/meshplus/crypto-standard/asym"
 	"github.com/meshplus/crypto-standard/ed25519"
 	"github.com/meshplus/crypto-standard/hash"
 	"github.com/meshplus/flato-msp-cert/primitives/x509"
+	"github.com/meshplus/gosdk/common"
 )
 
 //Key account key
@@ -70,15 +70,6 @@ type ECDSAKey struct {
 }
 
 func (key *ECDSAKey) GetAddress() common.Address {
-	if key.AlgorithmType() == asym.AlgoP256R1 {
-		bs, err := key.ECDSAPublicKey.Bytes()
-		if err != nil {
-			return common.Address{}
-		}
-		h, _ := hash.NewHasher(hash.KECCAK_256).Hash(bs)
-		return common.BytesToAddress(h[12:])
-	}
-
 	bs, err := key.ECDSAPublicKey.Bytes()
 	if err != nil {
 		return common.Address{}

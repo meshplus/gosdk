@@ -54,31 +54,25 @@ HVM合约的编写和编译请参考[http://hvm.internal.hyperchain.cn](http://h
 根据合约的构造函数是否有参数，实例化合约部署使用不同的方法，具体部署接口查看3.2.2文档。
 
 ```javascript
-transaction := rpc.NewTransaction(gmKey.GetAddress().String()).Deploy(bin)
+transaction := rpc.NewTransaction(gmKey.GetAddress()).Deploy(bin)
 transaction.Sign(gmKey)
 tx, err := rpcAPI.DeployContract(transaction)
-if err != nil {
-    return err
-}
 fmt.Println(tx.ContractAddress)
 ```
 
 其中VMType默认使用EVM，若为Java合约，则需要显示声明使用JVM，实例化transaction后部署。
 
 ```go
-tx := rpc.NewTransaction(gmKey.GetAddress().String()).Deploy(payload).VMType(rpc.JVM)
+tx := rpc.NewTransaction(gmKey.GetAddress()).Deploy(payload).VMType(rpc.JVM)
 tx.Sign(gmKey)
 txReceipt, err := rpcAPI.DeployContract(tx)
-if err != nil {
-    return err
-}
 contractAddress := txReceipt.ContractAddress
 ```
 
 HVM合约需要显式声明使用HVM，实例化transaction的部署
 
 ```go
-    transaction := NewTransaction(guomiKey.GetAddress().String()).Deploy(payload).VMType(HVM)
+    transaction := NewTransaction(guomiKey.GetAddress()).Deploy(payload).VMType(HVM)
     transaction.Sign(guomiKey)
     receipt, stdErr := rpc.DeployContract(transaction)
 ```
@@ -89,7 +83,7 @@ HVM合约需要显式声明使用HVM，实例化transaction的部署
 
 ```go
 packed, _ = ABI.Pack("getSum")
-transaction2 := rpc.NewTransaction(guomiKey.GetAddress().String()).Invoke(receipt.ContractAddress, packed)
+transaction2 := rpc.NewTransaction(guomiKey.GetAddress()).Invoke(receipt.ContractAddress, packed)
 transaction2.Sign(guomiKey)
 receipt2, _ := rpcAPI.InvokeContract(transaction2)
 ```
@@ -184,7 +178,7 @@ func main() {
     }
     fmt.Println("accountJson:", accountJson)
     key, err := account.NewAccountSm2FromAccountJSON(accountJson, "123")
-    if err != nil {
+    if err != nil {cc
         logger.Error(err)
         return
     }
@@ -359,7 +353,7 @@ func main() {
         return
     }
     // 构建部署交易结构体
-    tx := rpc.NewTransaction(key.GetAddress().String()).
+    tx := rpc.NewTransaction(key.GetAddress()).
         Deploy(bin).
         VMType(rpc.JVM)
     // 交易签名
@@ -374,7 +368,7 @@ func main() {
     contractAddr := txReceipt.ContractAddress
     // 调用java合约的 issue 方法，为自己发行1000token
     // 构建调用交易结构体
-    tx = rpc.NewTransaction(key.GetAddress().String()).
+    tx = rpc.NewTransaction(key.GetAddress()).
         Invoke(contractAddr, java.EncodeJavaFunc("issue", key.GetAddress(), "1000")).
         VMType(rpc.JVM)
     // 交易签名
@@ -386,7 +380,7 @@ func main() {
         return
     }
     // 查看自己账户内token余额
-    tx = rpc.NewTransaction(key.GetAddress().String()).
+    tx = rpc.NewTransaction(key.GetAddress()).
         Invoke(contractAddr, java.EncodeJavaFunc("getAccountBalance", key.GetAddress())).
         VMType(rpc.JVM)
     // 交易签名
@@ -402,7 +396,7 @@ func main() {
     fmt.Printf("getAccountBalance返回值解码后: %s\n", java.DecodeJavaResult(txReceipt.Ret))
     // 调用java合约testPostEvent方法
     // 构造调用交易结构体
-    tx = rpc.NewTransaction(key.GetAddress().String()).
+    tx = rpc.NewTransaction(key.GetAddress()).
         Invoke(contractAddr, java.EncodeJavaFunc("testPostEvent")).
         VMType(rpc.JVM)
     // 签名
@@ -511,7 +505,7 @@ func main() {
         logger.Error(sysErr)
         return
     }
-    transaction := rpc.NewTransaction(key.GetAddress().String()).Deploy(payload).VMType(rpc.HVM)
+    transaction := rpc.NewTransaction(key.GetAddress()).Deploy(payload).VMType(rpc.HVM)
     transaction.Sign(key)
     receipt, sysErr := hrpc.DeployContract(transaction)
     if sysErr != nil {
@@ -559,7 +553,7 @@ func main() {
         logger.Error(sysErr)
         return
     }
-    invokeTx := rpc.NewTransaction(key.GetAddress().String()).Invoke(receipt.ContractAddress, invokePayload).VMType(rpc.HVM)
+    invokeTx := rpc.NewTransaction(key.GetAddress()).Invoke(receipt.ContractAddress, invokePayload).VMType(rpc.HVM)
     invokeTx.Sign(key)
     invokeRe, sysErr := hrpc.InvokeContract(invokeTx)
     if sysErr != nil {
@@ -852,7 +846,7 @@ GoSDK中构造交易体采用的是链式调用，应该由**NewTransaction**开
 - 实例
 
 ```go
-transaction := rpc.NewTransaction(ecdsaKey.GetAddress().String())
+transaction := rpc.NewTransaction(ecdsaKey.GetAddress())
 ```
 
 3.2.1.1 实例化普通交易
@@ -877,7 +871,7 @@ transaction := rpc.NewTransaction(ecdsaKey.GetAddress().String())
 
 ```go
 // 便捷构造
-transaction := rpc.NewTransaction(ecdsaKey.GetAddress().String()).
+transaction := rpc.NewTransaction(ecdsaKey.GetAddress()).
     Transfer("0xbfa5bd992e3eb123c8b86ebe892099d4e9efb783", int64(1)).
     Extra("存证信息")
 fmt.Println(transaction)
@@ -885,7 +879,7 @@ fmt.Println(transaction)
 
 ```go
 // 自定义构造
-transaction = rpc.NewTransaction(ecdsaKey.GetAddress().String()).
+transaction = rpc.NewTransaction(ecdsaKey.GetAddress()).
     To("0xbfa5bd992e3eb123c8b86ebe892099d4e9efb783").
     Value(int64(1)).
     Extra("存证信息").
@@ -920,14 +914,14 @@ if err != nil {
     t.Error(err)
     return
 }
-transaction := rpc.NewTransaction(ecdsaKey.GetAddress().String()).Deploy(cr.Bin[0])
+transaction := rpc.NewTransaction(ecdsaKey.GetAddress()).Deploy(cr.Bin[0])
 fmt.Println(transaction)
 ```
 
 ```go
 // 构造函数无参java合约部署
 payload, _ := java.ReadJavaContract("../../conf/contract/contract01")
-transaction = rpc.NewTransaction(ecdsaKey.GetAddress().String()).
+transaction = rpc.NewTransaction(ecdsaKey.GetAddress()).
     Deploy(payload)
 fmt.Println(transaction)
 ```
@@ -940,7 +934,7 @@ payload, sysErr := hvm.ReadJar(jarPath)
         logger.Error(sysErr)
         return
     }
-transaction := rpc.NewTransaction(key.GetAddress().String()).Deploy(payload).VMType(rpc.HVM)
+transaction := rpc.NewTransaction(key.GetAddress()).Deploy(payload).VMType(rpc.HVM)
 ```
 
 如果**solidity合约**构造函数有参数，那么应该继续链式调用DeployArgs
@@ -962,7 +956,7 @@ transaction := rpc.NewTransaction(key.GetAddress().String()).Deploy(payload).VMT
 cr, _ = compileContract("../conf/contract/Accumulator2.sol")
 var arg [32]byte
 copy(arg[:], "test")
-transaction = rpc.NewTransaction(ecdsaKey.GetAddress().String()).
+transaction = rpc.NewTransaction(ecdsaKey.GetAddress()).
     Deploy(cr.Bin[0]).
     DeployArgs(cr.Abi[0], uint32(10), arg)
 fmt.Println(transaction)
@@ -971,7 +965,7 @@ fmt.Println(transaction)
 ```go
 // 构造函数带参java合约部署
 payload, _ = java.ReadJavaContract("../../conf/contract/contract01",  "1")
-transaction = rpc.NewTransaction(ecdsaKey.GetAddress().String()).
+transaction = rpc.NewTransaction(ecdsaKey.GetAddress()).
     Deploy(payload)
 fmt.Println(transaction)
 ```
@@ -984,7 +978,7 @@ payload, sysErr := hvm.ReadJar(jarPath)
         logger.Error(sysErr)
         return
     }
-transaction := rpc.NewTransaction(key.GetAddress().String()).Deploy(payload).VMType(rpc.HVM)
+transaction := rpc.NewTransaction(key.GetAddress()).Deploy(payload).VMType(rpc.HVM)
 ```
 
 3.2.1.3 实例化合约调用交易
@@ -1021,15 +1015,15 @@ if err != nil {
     t.Error(sysErr)
     return
 }
-transaction := rpc.NewTransaction(ecdsaKey.GetAddress().String().
+transaction := rpc.NewTransaction(ecdsaKey.GetAddress()).
     Invoke(contractAddress, packed))
 fmt.Println(transaction)
 ```
 
 ```go
 // java合约调用
-tx = rpc.NewTransaction(ecdsaKey.GetAddress().String()).
-    Invoke(contractAddress, java.EncodeJavaFunc("issue", ecdsaKey.GetAddress().String(), "1000")).
+tx = rpc.NewTransaction(ecdsaKey.GetAddress()).
+    Invoke(contractAddress, java.EncodeJavaFunc("issue", ecdsaKey.GetAddress(), "1000")).
     VMType(rpc.JVM)
 fmt.Println(tx)
 ```
@@ -1047,7 +1041,7 @@ fmt.Println(tx)
     //下面这种方式也可以，GenPayLoad接受的是一个个字符
     //invokePayload, sysErr := hvm.GenPayload(beanAbi, "true", "c", "20", "100", "1000", "10000", "1.1", "1.11", "string", `["1f","2f","3f"]`,`[1,2,3]`, `{789:{456:12.2},234:{345:12.2}}`, `[[1,2],[2,4]]`, `{"name":"tom","age":21}`, `{"beanName":"hvm-bean1","person":{"name":"tom","age":21}}`, `["strList1","strList2"]`, `[{"name":"tom","age":21},{"name":"jack","age":18}]`, `{"person1":{"name":"tom","age":21},"person2":{"name":"jack","age":18}}`, `{"bean1":{"beanName":"hvm-bean1","person":{"name":"tom","age":21}},"bean2":{"beanName":"hvm-bean2","person":{"name":"jack","age":18}}}`)
 undefined
-invokeTx := rpc.NewTransaction(key.GetAddress().String()).Invoke(receipt.ContractAddress, invokePayload).VMType(rpc.HVM)
+invokeTx := rpc.NewTransaction(key.GetAddress()).Invoke(receipt.ContractAddress, invokePayload).VMType(rpc.HVM)
 fmt.Println(invokeTx)
 ```
 
@@ -1093,18 +1087,18 @@ fmt.Println(invokeTx)
 - 实例
 
 ```text
-updateTx := rpc.NewTransaction(key.GetAddress().String()).Maintain(1 , receipt.ContractAddress, updatePayload).VMType(rpc.HVM)
+updateTx := rpc.NewTransaction(key.GetAddress()).Maintain(1 , receipt.ContractAddress, updatePayload).VMType(rpc.HVM)
 ```
 
 ```go
 // 便捷调用
-transactionUpdate := rpc.NewTransaction(ecdsaKey.GetAddress().String()).
+transactionUpdate := rpc.NewTransaction(ecdsaKey.GetAddress()).
     Maintain(1, contractAddress, compileUpdate.Bin[0])
 ```
 
 ```go
 // 自定义调用
-transactionUpdate := rpc.NewTransaction(ecdsaKey.GetAddress().String()).
+transactionUpdate := rpc.NewTransaction(ecdsaKey.GetAddress()).
         OpCode(1).
         To(contractAddress).
         Payload(compileUpdate.Bin[0])
@@ -1123,7 +1117,7 @@ transactionUpdate := rpc.NewTransaction(ecdsaKey.GetAddress().String()).
 - 实例
 
 ```go
-transaction := rpc.NewTransaction(ecdsaKey.GetAddress().String())
+transaction := rpc.NewTransaction(ecdsaKey.GetAddress())
 transaction.Sign(ecdsaKey)
 ```
 
@@ -1176,7 +1170,7 @@ fmt.Println(txs[len(txs)-1].Hash)
 - 实例
 
 ```go
-transaction := rpc.NewTransaction(ecdsaKey.GetAddress().String()).Deploy(binContract)
+transaction := rpc.NewTransaction(ecdsaKey.GetAddress()).Deploy(binContract)
 transaction.Sign(ecdsaKey)
 receipt, _ := hrpc.DeployContract(transaction)
 tx, err := hrpc.GetTransactionByHash(receipt.TxHash)
@@ -1394,29 +1388,11 @@ receipt, err := hrpc.SendTx(transaction)
 
 3.2.19 异步发送转账交易
 
-`func (r *RPC) SendTxAsync(transaction *Transaction, handler AsyncHandler)`
 
-- 说明：异步发送转账交易
 
-- 参数【transaction】：普通交易结构体（构造普通交易结构体见3.2.1.1）。【handler】：实现了AsyncHandler接口的回调函数，当合约执行完毕后会被异步自动调用。
-
+- 取消支持
 - 实例
 
-```go
-type TestAsyncHandler struct {
-    t        *testing.T
-    IsCalled bool
-}
-func (tah *TestAsyncHandler) OnSuccess(receipt *rpc.TxReceipt) {
-    tah.IsCalled = true
-    fmt.Println(receipt.Ret)
-}
-func (tah *TestAsyncHandler) OnFailure(err rpc.StdError) {
-    tah.t.Error(err.String())
-}
-asyncHandler := TestAsyncHandler{t: t}
-hrpc.SendTxAsync(transaction, &asyncHandler)
-```
 
 3.2.20 查询区块区间交易数量（by method ID）
 
@@ -1496,6 +1472,70 @@ txCount,err := r.GetDiscardTransactionsByTime(start, end)
 
 ```go
 txCount,err := r.GetTransactionsCountByTime(startTime, endTime)
+```
+
+3.2.25 查询指定区块范围内的非法交易数量
+
+`func (rpc *RPC) GetInvalidTransactionsByBlkNumWithLimit(start, end uint64, metadata *Metadata) (*PageResult, StdError)`
+
+- 说明：查询指定区块范围内的非法交易数量
+
+- 参数【start】：起始区块号【end】：结束区块号
+
+- 返回【返回值1】：该区块号区间内的交易列表。交易结构体详细信息请看4.1.2。【返回值2】：错误类型请见4.1.5。
+
+- 实例
+
+```go
+pageResult, err := rpc.GetInvalidTransactionsByBlkNumWithLimit(start, end, metadata)
+```
+
+3.2.26 根据区块号查询区块内的非法交易列表
+
+`func (rpc *RPC) GetInvalidTransactionsByBlkNum(blkNum uint64) ([]TransactionInfo, StdError)`
+
+- 说明：根据区块号查询区块内的非法交易列表
+
+- 参数【blkNum】：目标区块号。
+
+- 返回【返回值1】：该区块号内的非法交易列表。交易结构体详细信息请看4.1.2。【返回值2】：错误类型请见4.1.5。
+
+- 实例
+
+```go
+txInfos, err := rpc.GetInvalidTransactionsByBlkNum(block.Number)
+```
+
+3.2.27 根据区块哈希查询区块内的非法交易列表
+
+`func (rpc *RPC) GetInvalidTransactionsByBlkHash(hash string) ([]TransactionInfo, StdError)`
+
+- 说明：根据区块哈希查询区块内的非法交易列表
+
+- 参数【hash】：目标区块哈希。
+
+- 返回【返回值1】：该区块号内的非法交易列表。交易结构体详细信息请看4.1.2。【返回值2】：错误类型请见4.1.5。
+
+- 实例
+
+```go
+txInfos, err := rpc.GetInvalidTransactionsByBlkHash(block.Hash)
+```
+
+3.2.28 获取链上的非法交易数
+
+`func (r *RPC) GetInvalidTxCount() (uint64, StdError)`
+
+- 说明：获取链上的非法交易数
+
+- 参数 无。
+
+- 返回【返回值1】：链上的非法交易数量。【返回值2】：错误类型请见4.1.5。
+
+- 实例
+
+```go
+count, err := rpc.GetInvalidTxCount()
 ```
 
 ### 3.3 Contract相关接口
@@ -1588,11 +1628,11 @@ HVM合约暂时不提供编译接口调用，在本地编译后将jar文件放�
 
 - inputs代表invoke方法的参数  其中
 
-    - name 代表变量名称
+  - name 代表变量名称
 
-    - type代表变量类型
+  - type代表变量类型
 
-    - 如果是结构体则structname代表结构体类的名称
+  - 如果是结构体则structname代表结构体类的名称
 
 - output代表invoke方法的返回值
 
@@ -1715,7 +1755,7 @@ HVM合约暂时不提供编译接口调用，在本地编译后将jar文件放�
 - 实例
 
 ```go
-transaction := rpc.NewTransaction(gmKey.GetAddress().String()).Deploy(bin)
+transaction := rpc.NewTransaction(gmKey.GetAddress()).Deploy(bin)
 transaction.Sign(gmKey)
 tx, err := rpcAPI.DeployContract(transaction)
 if err != nil {
@@ -1725,50 +1765,6 @@ if err != nil {
 fmt.Println(tx.ContractAddress)
 ```
 
-3.3.2.2 部署合约(异步)
-
-`func (r *RPC) DeployContractAsync(transaction *Transaction, handler AsyncHandler)`
-
-- 说明：异步部署合约需要初始化部署Transaction和回调函数的接口实现。
-
-- 参数【transaction】：部署transaction。【handler】：回调函数接口。
-
-- 实例
-
-```go
-transaction := rpc.NewTransaction(key.GetAddress().String()).Deploy(bin)
-transaction.Sign(key)
-handler := new(AsyncHandler)
-rpcAPI.DeployContractAsync(transaction, handler)
-for !handler.IsCalled {
-    time.Sleep(time.Second)
-}
-if handler.Error != nil {
-    fmt.Println(handler.Error)
-    return
-}
-fmt.Println(handler.TxReceipt.ContractAddress)
-```
-
-其中AsyncHandler的实现为
-
-```go
-type AsyncHandler struct {
-    TxReceipt *rpc.TxReceipt
-    Error     rpc.StdError
-    IsCalled  bool
-}
-func (ah *AsyncHandler) OnSuccess(receipt *rpc.TxReceipt) {
-    ah.IsCalled = true
-    ah.TxReceipt = receipt
-    ah.Error = nil
-}
-func (ah *AsyncHandler) OnFailure(err rpc.StdError) {
-    ah.IsCalled = true
-    ah.TxReceipt = nil
-    ah.Error = err
-}
-```
 
 3.3.3 调用合约
 
@@ -1787,38 +1783,12 @@ func (ah *AsyncHandler) OnFailure(err rpc.StdError) {
 ```go
 ABI, _ := abi.JSON(strings.NewReader(abi)
 packed, _ := ABI.Pack("add", uint32(1), uint32(2))
-transaction := rpc.NewTransaction(key.GetAddress().String()).Invoke(txDeploy.ContractAddress, packed)
+transaction := rpc.NewTransaction(key.GetAddress()).Invoke(txDeploy.ContractAddress, packed)
 transaction.Sign(key)
 txInvoke, _ := rpcAPI.InvokeContract(transaction)
 fmt.Println(txInvoke.Ret)
 ```
 
-3.3.3.2 调用合约(异步)
-
-`func (r *RPC) InvokeContractAsync(transaction *Transaction, handler AsyncHandler)`
-
-- 说明：异步调用合约需要初始化调用Transaction和回调函数的接口实现。
-
-- 参数【transaction】：调用transaction，transaction中调用合约有参数需要用abi来进行编码。【handler】：回调函数接口。
-
-- 实例
-
-```go
-transaction := rpc.NewTransaction(gmKey.GetAddress().String()).Invoke(contractAddress, packed)
-transaction.Sign(gmKey)
-handler := new(AsyncHandler)
-rpcAPI.InvokeContractAsync(transaction, handler)
-for !handler.IsCalled {
-    time.Sleep(time.Second)
-}
-if handler.Error != nil {
-    fmt.Println(handler.Error)
-    return
-}
-fmt.Println(handler.TxReceipt.Ret)
-```
-
-其中AsyncHandler的实现同上异步部署
 
 **注意**：ABI升级需要将Solidity合约的具体类型和Go的具体类型对应起来，开发应用时需要注意，下面给出了Silidity合约的具体类型和Go类型对应的具体实例：
 
@@ -1865,7 +1835,7 @@ ABI, _ := abi.JSON(strings.NewReader(abiStr))
     var data8 [8]byte
     copy(data8[:], "byte8")
     packed1, _ := ABI.Pack("fun1", []byte("data1"), data32, data8)
-    invokeTx1 := NewTransaction(guomiKey.GetAddress().String()).Invoke(contractAddress, packed1)
+    invokeTx1 := NewTransaction(guomiKey.GetAddress()).Invoke(contractAddress, packed1)
     invokeTx1.Sign(guomiKey)
     invokeRe1, _ := rpc.InvokeContract(invokeTx1)
     var p0 []byte
@@ -1886,7 +1856,7 @@ ABI, _ := abi.JSON(strings.NewReader(abiStr))
     int1 := int64(-10001)
     int2 := int8(101)
     packed, _ := ABI.Pack("fun2", bigInt1, bigInt2, bigInt3, int1, int2)
-    invokeTx := NewTransaction(guomiKey.GetAddress().String()).Invoke(contractAddress, packed)
+    invokeTx := NewTransaction(guomiKey.GetAddress()).Invoke(contractAddress, packed)
     invokeTx.Sign(guomiKey)
     invokeRe, _ := rpc.InvokeContract(invokeTx)
     var p0 interface{}
@@ -1909,7 +1879,7 @@ ABI, _ := abi.JSON(strings.NewReader(abiStr))
     int1 := uint64(10001)
     int2 := uint8(101)
     packed, _ := ABI.Pack("fun3", bigInt1, bigInt2, bigInt3, int1, int2)
-    invokeTx := NewTransaction(guomiKey.GetAddress().String()).Invoke(contractAddress, packed)
+    invokeTx := NewTransaction(guomiKey.GetAddress()).Invoke(contractAddress, packed)
     invokeTx.Sign(guomiKey)
     invokeRe, _ := rpc.InvokeContract(invokeTx)
     var p0 interface{}
@@ -1933,7 +1903,7 @@ ABI, _ := abi.JSON(strings.NewReader(abiStr))
     a16uint := uint16(10001)
     bigInt6 := big.NewInt(111111)
     packed, _ := ABI.Pack("fun4", bigInt1, a16int, bigInt3, bigInt4, a16uint, bigInt6)
-    invokeTx := NewTransaction(guomiKey.GetAddress().String()).Invoke(contractAddress, packed)
+    invokeTx := NewTransaction(guomiKey.GetAddress()).Invoke(contractAddress, packed)
     invokeTx.Sign(guomiKey)
     invokeRe, _ := rpc.InvokeContract(invokeTx)
     var p0 interface{}
@@ -1954,7 +1924,7 @@ ABI, _ := abi.JSON(strings.NewReader(abiStr))
     address := common.Address{}
     address.SetString("2312321312")
     packed, _ := ABI.Pack("fun5", "data1", address)
-    invokeTx := NewTransaction(guomiKey.GetAddress().String()).Invoke(contractAddress, packed)
+    invokeTx := NewTransaction(guomiKey.GetAddress()).Invoke(contractAddress, packed)
     invokeTx.Sign(guomiKey)
     invokeRe, _ := rpc.InvokeContract(invokeTx)
     var p0 string
@@ -1985,7 +1955,7 @@ ABI, _ := abi.JSON(strings.NewReader(abiStr))
 升级合约
 
 ```go
-transactionUpdate := rpc.NewTransaction(gmKey.GetAddress().String()).Maintain(1, originContractAddress, compileUpdate.Bin[0])
+transactionUpdate := rpc.NewTransaction(gmKey.GetAddress()).Maintain(1, originContractAddress, compileUpdate.Bin[0])
 transactionUpdate.Sign(gmKey)
 receiptUpdate, err := rpcAPI.MaintainContract(transactionUpdate)
 if err != nil {
@@ -1999,47 +1969,20 @@ fmt.Println(receiptUpdate.ContractAddress)
 
 ```go
 // freeze contract
-transactionFreeze := rpc.NewTransaction(gmKey.GetAddress().String()).Maintain(2, contractAddress, "")
+transactionFreeze := rpc.NewTransaction(gmKey.GetAddress()).Maintain(2, contractAddress, "")
 transactionFreeze.Sign(gmKey)
 receiptFreeze, err := rpcAPI.MaintainContract(transactionFreeze)
 fmt.Println(receiptFreeze.TxHash)
 status, err := rpcAPI.GetContractStatus(contractAddress)
 fmt.Println("contract status >>", status)
 // unfreeze contract
-transactionUnfreeze := rpc.NewTransaction(gmKey.GetAddress().String()).Maintain(3, contractAddress, "")
+transactionUnfreeze := rpc.NewTransaction(gmKey.GetAddress()).Maintain(3, contractAddress, "")
 transactionUnfreeze.Sign(gmKey)
 receiptUnFreeze, err := rpcAPI.MaintainContract(transactionUnfreeze)
 fmt.Println(receiptUnFreeze.TxHash)
 status, _ = rpcAPI.GetContractStatus(contractAddress)
 fmt.Println("contract status >>", status)
 ```
-
-3.3.4.2 异步管理
-
-`func (r *RPC) MaintainContractAsync(transaction *Transaction, handler AsyncHandler)`
-
-- 说明：异步管理合约需要初始化管理Transaction和回调函数的接口实现。
-
-- 参数【transaction】：管理transaction，transaction中不同的opCode代表不同的操作，1代表升级合约，2代表冻结合约，3代表解冻合约。【handler】：回调函数接口。
-
-- 实例
-
-```go
-transaction := rpc.NewTransaction(gmKey.GetAddress().String()).Maintain(1, contractAddress, bin)
-transaction.Sign(gmKey)
-handler := new(AsyncHandler)
-rpcAPI.MaintainContractAsync(transaction, handler)
-for !handler.IsCalled {
-    time.Sleep(time.Second)
-}
-if handler.Error != nil {
-    fmt.Println(handler.Error)
-    return
-}
-fmt.Println(handler.TxReceipt.Ret)
-```
-
-异步AsyncHandler同上一致，对合约异步冻结和解冻只需修改transaction中的opCode即可，不再赘述。
 
 3.3.5 获取合约状态
 
@@ -2076,7 +2019,7 @@ fmt.Println(statu)
 - 实例
 
 ```go
-contracts, err := rpcAPI.GetDeployedList(gmKey.GetAddress().String())
+contracts, err := rpcAPI.GetDeployedList(gmKey.GetAddress())
 if err != nil {
     fmt.Println(err)
     return
@@ -2638,7 +2581,7 @@ res, err := hrpc.ListSnapshot()
 res, err := hrpc.ReadSnapshot("0x5d86cce7e537cd0e0346468889801196")
 ```
 
-3.6.9 恢复归档数据(弃用)
+3.6.9 恢复归档数据
 
 `func (r *RPC) Restore(filterID string, sync bool) (bool, StdError)`
 
@@ -2684,27 +2627,18 @@ res, err := hrpc.RestoreAll(true)
 res, err := hrpc.Pending()
 ```
 
-3.6.12 查询数据归档状态
+3.6.12 查询最近一次归档的状态
 
-`func (rpc *RPC) QueryArchive(filterID string) (string, StdError)`
+`func (rpc *RPC) QueryLatestArchive() (*ArchiveResult, StdError)`
 
-- 说明：查询数据归档状态
-- 参数【filterID】: 快照号
-- 返回【返回值1】：返回归档状态 【返回值2】： 错误类型请见4.1.5
+- 说明：返回一个归档结果信息。
+
+- 返回【返回值1】：归档的进度及失败原因，详见4.1.7。【返回值2】：错误类型请见4.1.5。
+
 - 实例
-```go
-res, err := hrpc.QueryArchive("0x5d86cce7e537cd0e0346468889801196")
-```
 
-3.6.13 数据直接归档
-`func (rpc *RPC) ArchiveNoPredict(filterID string) (string, StdError)`
-
-- 说明：数据直接归档
-- 参数【filterID】: 快照号
-- 返回【返回值1】：此次请求是否符合要求 【返回值2】： 错误类型请见4.1.5
-- 实例
 ```go
-res, err := hrpc.ArchiveNoPredict("0x5d86cce7e537cd0e0346468889801196")
+res, err := hrpc.QueryLatestArchive()
 ```
 
 ### 3.7 返回值解析
@@ -3173,7 +3107,7 @@ address := key.GetAddress()
 - 实例
 
 ```go
-balance, err := rpcAPI.GetBalance(key.GetAddress().String())
+balance, err := rpcAPI.GetBalance(key.GetAddress())
 ```
 
 ### 3.10 WebSocket相关接口
@@ -3655,9 +3589,26 @@ err := ABI.UnpackInputWithoutMethod(&testV, data)
         []interface{}{[]interface{}{"bean1", bean1}, []interface{}{"bean2", bean2}})
 ```
 
-### 4.12 MQ相关接口
+3.11.12
 
-4.12.1 获取MQ请求客户端
+`func Validate(account string, proofPath *AccountProofPath) bool`
+
+- 说明：得到账户的证明路径后，调用验证方法验证证明路径的正确性。
+
+- 参数​ 【account】：账户地址。​ 【path】：证明路径。
+
+- 返回​ ：验证结果。
+
+- 实例
+
+```go
+   proofPath, err := rpcAPI.GetAccountProof(key.GetAddress())
+   res := rpcAPI.Validate(key.GetAddress(),proofPath)
+```
+
+### 3.12 MQ相关接口
+
+3.12.1 获取MQ请求客户端
 
 `func (r *RPC) GetMqClient() *MqClient`
 
@@ -3671,7 +3622,7 @@ err := ABI.UnpackInputWithoutMethod(&testV, data)
 client := rpc.GetMqClient()
 ```
 
-4.12.2 与broker建立连接
+3.12.2 与broker建立连接
 
 `func (mc *MqClient) InformNormal(id uint, brokerURL string) (bool, StdError)`
 
@@ -3687,7 +3638,7 @@ client := rpc.GetMqClient()
 success, err := client.InformNormal(1, "")
 ```
 
-4.12.3 注册MQ channel
+3.12.3 注册MQ channel
 
 `func (mc *MqClient) Register(id uint, meta *RegisterMeta) (*QueueRegister, StdError)`
 
@@ -3702,12 +3653,12 @@ success, err := client.InformNormal(1, "")
 ```go
 var hash common.Hash
 hash.SetString("123")
-rm := NewRegisterMeta(guomiKey.GetAddress().String(), "node1queue1", MQBlock).SetTopics(1, hash)
+rm := NewRegisterMeta(guomiKey.GetAddress(), "node1queue1", MQBlock).SetTopics(1, hash)
 rm.Sign(guomiKey)
 regist, err := client.Register(1, rm)
 ```
 
-4.12.4 注销MQ channel
+3.12.4 注销MQ channel
 
 `func (mc *MqClient) UnRegister(id uint, meta *UnRegisterMeta) (*QueueUnRegister, StdError)`
 
@@ -3720,12 +3671,12 @@ regist, err := client.Register(1, rm)
 - 实例
 
 ```go
-meta := NewUnRegisterMeta(guomiKey.GetAddress().String(), "node1queue1", "global_fa34664e_1541655230749576905")
+meta := NewUnRegisterMeta(guomiKey.GetAddress(), "node1queue1", "global_fa34664e_1541655230749576905")
 meta.Sign(guomiKey)
 unRegist, err := client.UnRegister(1, meta)
 ```
 
-4.12.5 获取所有队列名称
+3.12.5 获取所有队列名称
 
 `(mc *MqClient) GetAllQueueNames(id uint) ([]string, StdError)`
 
@@ -3739,6 +3690,22 @@ unRegist, err := client.UnRegister(1, meta)
 
 ```go
 queues, err := client.GetAllQueueNames(1)
+```
+
+### 3.13 PROOF相关接口
+
+3.13.1 获取指定账户的证明路径
+
+`func (rpc *RPC) GetAccountProof(account string) (*AccountProofPath, StdError)`
+
+- 说明：获取指定账户的证明路径。
+
+- 返回：【返回值1】：指定账户的证明路径。
+
+- 实例
+
+```go
+proofPath, err := rpcAPI.GetAccountProof(key.GetAddress())
 ```
 
 ## 4.1 GoSDK涉及类型说明
@@ -4002,13 +3969,18 @@ type QueueUnRegister struct {
 ```go
 // Manifest represents all basic information of a snapshot.
 type Manifest struct {
-    Height     uint64 `json:"height"`
-    Genesis    uint64 `json:"genesis"`
-    BlockHash  string `json:"hash"`
-    FilterId   string `json:"filterId"`
-    MerkleRoot string `json:"merkleRoot"`
-    Date       string `json:"date"`
-    Namespace  string `json:"namespace"`
+	Height         uint64 `json:"height"`
+	Genesis        uint64 `json:"genesis"`
+	BlockHash      string `json:"hash"`
+	FilterID       string `json:"filterId"`
+	MerkleRoot     string `json:"merkleRoot"`
+	Namespace      string `json:"Namespace"`
+	TxCount        uint64 `json:"txCount"`
+	InvalidTxCount uint64 `json:"invalidTxCount,omitEmpty"`
+	Status         uint   `json:"status"`
+	DBVersion      string `json:"dbVersion"`
+	// use for hyperchain
+	Date string `json:"date"`
 }
 ```
 
@@ -4022,6 +3994,15 @@ type Manifests []Manifest
 type SnapshotEvent struct {
     FilterId    string `json:"filterId"`
     BlockNumber uint64 `json:"blockNumber"`
+}
+```
+
+```go
+// ArchiveResult used for return archive result, tell caller which step is processing
+type ArchiveResult struct {
+	FilterID string `json:"filterId"`
+	Status   string `json:"status"`
+	Reason   string `json:"reason"`
 }
 ```
 
