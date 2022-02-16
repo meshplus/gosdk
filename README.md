@@ -2,7 +2,7 @@
 
 This is gosdk for [Hyperchain](http://www.hyperchain.cn).
 
-To get more information you can view [docs](docs/hyperchain_gosdk_document.md), use gosdk to start a enjoyable journey.
+To get more information you can view [docs](https://github.com/meshplus/gosdk/wiki/Gosdk-%E4%BD%BF%E7%94%A8%E6%96%87%E6%A1%A3), use gosdk to start a enjoyable journey.
 
 ## Get started
 
@@ -113,7 +113,7 @@ fmt.Println(result)
 If you have any suggestions or idea, please submit issue in this project!
 
 ## Doc
-If you want to know more about GO-SDK, you can read manual at [here](docs/hyperchain_gosdk_document.md).
+If you want to know more about GO-SDK, you can read manual at [here](https://github.com/meshplus/gosdk/wiki/Gosdk-%E4%BD%BF%E7%94%A8%E6%96%87%E6%A1%A3).
 
 ## Contribute
 
