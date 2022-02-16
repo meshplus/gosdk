@@ -6,6 +6,7 @@ const (
 )
 
 const (
+	Title         = "title"
 	NamespaceConf = "namespace"
 	ReConnectTime = "reConnectTime"
 )
@@ -41,6 +42,7 @@ const (
 	SecurityTlsca       = "security.tlsca"
 	SecurityTlspeerCert = "security.tlspeerCert"
 	SecurityTlspeerPriv = "security.tlspeerPriv"
+	SecurityTlsDomain   = "security.tlsDomain"
 )
 
 const (

@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/meshplus/gosdk/config"
 	"io"
 	"io/ioutil"
 	"net"
@@ -16,7 +17,6 @@ import (
 	"time"
 
 	"github.com/meshplus/gosdk/common"
-	"github.com/terasum/viper"
 )
 
 type RequestType string
@@ -70,7 +70,7 @@ type httpRequestManager struct {
 }
 
 // newHTTPRequestManager is used to construct httpRequestManager
-func newHTTPRequestManager(vip *viper.Viper, confRootPath string, txVersion string) (hrm *httpRequestManager) {
+func newHTTPRequestManager(cf *config.Config, confRootPath string) (hrm *httpRequestManager) {
 	var (
 		namespace string
 		urls      []string
@@ -80,21 +80,21 @@ func newHTTPRequestManager(vip *viper.Viper, confRootPath string, txVersion stri
 		tcm       *TCertManager
 	)
 
-	namespace = vip.GetString(common.NamespaceConf)
+	namespace = cf.GetNamespace()
 
-	urls = vip.GetStringSlice(common.JSONRPCNodes)
+	urls = cf.GetNodes()
 	logger.Debugf("[CONFIG]: %s = %v", common.JSONRPCNodes, urls)
 
-	rpcPorts = vip.GetStringSlice(common.JSONRPCPorts)
+	rpcPorts = cf.GetRPCPorts()
 	logger.Debugf("[CONFIG]: %s = %v", common.JSONRPCPorts, rpcPorts)
 
-	wsPorts = vip.GetStringSlice(common.WebSocketPorts)
+	wsPorts = cf.GetWebSocketPorts()
 	logger.Debugf("[CONFIG]: %s = %v", common.WebSocketPorts, wsPorts)
 
-	isHTTPS = vip.GetBool(common.SecurityHttps)
+	isHTTPS = cf.IsHttps()
 	logger.Debugf("[CONFIG]: %s = %v", common.SecurityHttps, isHTTPS)
 
-	reConnTime := vip.GetInt64(common.ReConnectTime)
+	reConnTime := cf.GetReConnectTime()
 
 	var nodes = make([]*Node, len(urls))
 
@@ -102,15 +102,16 @@ func newHTTPRequestManager(vip *viper.Viper, confRootPath string, txVersion stri
 		nodes[i] = newNode(url, rpcPorts[i], wsPorts[i], isHTTPS)
 	}
 
-	sendTcert := vip.GetBool(common.PrivacySendTcert)
+	sendTcert := cf.IsSendTcert()
 	logger.Debugf("[CONFIG]: sendTcert = %v", sendTcert)
 
-	tcm = NewTCertManager(vip, confRootPath)
+	tcm = NewTCertManager(cf.GetVipper(), confRootPath)
 
+	txVersion := cf.GetTxVersion()
 	httpRequestManager := &httpRequestManager{
 		nodes:      nodes,
 		nodeIndex:  0,
-		client:     newHTTPClient(vip, confRootPath),
+		client:     newHTTPClient(cf, confRootPath),
 		namespace:  namespace,
 		sendTcert:  sendTcert,
 		tcm:        tcm,
@@ -119,7 +120,7 @@ func newHTTPRequestManager(vip *viper.Viper, confRootPath string, txVersion stri
 		txVersion:  txVersion,
 	}
 
-	if sendTcert && !vip.GetBool(common.PrivacyCfca) && !isFlato(txVersion) {
+	if sendTcert && !cf.IsCfca() && !isFlato(txVersion) {
 		tcm.tcertPool = make(map[string]TCert)
 		for _, node := range nodes {
 			tcert, err := httpRequestManager.getTCert(node.url)
@@ -138,11 +139,11 @@ func newHTTPRequestManager(vip *viper.Viper, confRootPath string, txVersion stri
 	return httpRequestManager
 }
 
-func newHTTPClient(vip *viper.Viper, confRootPath string) *http.Client {
-	logger.Debugf("[CONFIG]: https = %v", vip.GetBool(common.SecurityHttps))
+func newHTTPClient(cf *config.Config, confRootPath string) *http.Client {
+	logger.Debugf("[CONFIG]: https = %v", cf.IsHttps())
 
-	maxIdleConns := vip.GetInt(common.MaxIdleConns)
-	maxIdleConnsPerHost := vip.GetInt(common.MaxIdleConnsPerHost)
+	maxIdleConns := cf.GetMaxIdleConns()
+	maxIdleConnsPerHost := cf.GetMaxIdleConnsPerHost()
 
 	tr := &http.Transport{
 		DialContext: (&net.Dialer{
@@ -157,12 +158,12 @@ func newHTTPClient(vip *viper.Viper, confRootPath string) *http.Client {
 		ExpectContinueTimeout: 1 * time.Second,  //发送完请求到接收到响应头的超时时间
 	}
 
-	if vip.GetBool(common.SecurityHttps) {
+	if cf.IsHttps() {
 		pool := x509.NewCertPool()
 
-		tlscaPath := strings.Join([]string{confRootPath, vip.GetString(common.SecurityTlsca)}, "/")
-		tlspeerCertPath := strings.Join([]string{confRootPath, vip.GetString(common.SecurityTlspeerCert)}, "/")
-		tlspeerCertPrivPath := strings.Join([]string{confRootPath, vip.GetString(common.SecurityTlspeerPriv)}, "/")
+		tlscaPath := strings.Join([]string{confRootPath, cf.GetTlscaPath()}, "/")
+		tlspeerCertPath := strings.Join([]string{confRootPath, cf.GetTlspeerCertPath()}, "/")
+		tlspeerCertPrivPath := strings.Join([]string{confRootPath, cf.GetTlspeerPriv()}, "/")
 
 		caCrt, err := ioutil.ReadFile(tlscaPath)
 		if err != nil {
