@@ -7,8 +7,8 @@ import (
 	"github.com/meshplus/gosdk/account"
 	"github.com/meshplus/gosdk/common"
 	"github.com/meshplus/gosdk/common/types"
+	"github.com/meshplus/gosdk/config"
 	"io/ioutil"
-	"path/filepath"
 	"reflect"
 	"strconv"
 	"strings"
@@ -81,6 +81,7 @@ type RPC struct {
 	txVersion          string
 	chainID            string
 	im                 *inspectorManager
+	config             *config.Config
 }
 
 type inspectorManager struct {
@@ -128,66 +129,30 @@ func NewRPC() *RPC {
 //		│   └── unique.pub
 //		└── hpc.toml
 func NewRPCWithPath(confRootPath string) *RPC {
-	vip := viper.New()
-	vip.SetConfigFile(filepath.Join(confRootPath, common.DefaultConfRelPath))
-	err := vip.ReadInConfig()
+	cf, err := config.NewFromFile(confRootPath)
 	if err != nil {
-		panic(fmt.Sprintf("read conf from %s error", filepath.Join(confRootPath, common.DefaultConfRelPath)))
+		panic(err)
 	}
 
-	common.InitLog(vip)
-	namespace := vip.GetString(common.NamespaceConf)
-	logger.Debugf("[CONFIG]: %s = %v", common.NamespaceConf, namespace)
-
-	resTime := vip.GetInt64(common.PollingResendTime)
-	logger.Debugf("[CONFIG]: %s = %v", common.PollingResendTime, resTime)
-
-	firstPollInterval := vip.GetInt64(common.PollingFirstPollingInterval)
-	logger.Debugf("[CONFIG]: %s = %v", common.PollingFirstPollingInterval, firstPollInterval)
-
-	firstPollTime := vip.GetInt64(common.PollingFirstPollingTimes)
-	logger.Debugf("[CONFIG]: %s = %v", common.PollingFirstPollingTimes, firstPollTime)
-
-	secondPollInterval := vip.GetInt64(common.PollingSecondPollingInterval)
-	logger.Debugf("[CONFIG]: %s = %v", common.PollingSecondPollingInterval, secondPollInterval)
-
-	secondPollTime := vip.GetInt64(common.PollingSecondPollingTimes)
-	logger.Debugf("[CONFIG]: %s = %v", common.PollingSecondPollingTimes, secondPollTime)
-	reConnTime := vip.GetInt64(common.ReConnectTime)
-	logger.Debugf("[CONFIG]: %s = %v", common.ReConnectTime, reConnTime)
-
-	version := vip.GetString(common.TxVersion)
-	logger.Debugf("[CONFIG]: %s = %v", common.TxVersion, version)
-
-	im := newInspectorManager(vip, confRootPath)
-
-	httpRequestManager := newHTTPRequestManager(vip, confRootPath, version)
+	im := newInspectorManager(cf, confRootPath)
+	httpRequestManager := newHTTPRequestManager(cf, confRootPath)
 
 	rpc := &RPC{
 		hrm:                *httpRequestManager,
-		namespace:          namespace,
-		resTime:            resTime,
-		firstPollInterval:  firstPollInterval,
-		firstPollTime:      firstPollTime,
-		secondPollInterval: secondPollInterval,
-		secondPollTime:     secondPollTime,
-		reConnTime:         reConnTime,
+		namespace:          cf.GetNamespace(),
+		resTime:            cf.GetResendTime(),
+		firstPollInterval:  cf.GetFirstPollingInterval(),
+		firstPollTime:      cf.GetFirstPollingTimes(),
+		secondPollInterval: cf.GetSecondPollingInterval(),
+		secondPollTime:     cf.GetSecondPollingTimes(),
+		reConnTime:         cf.GetReConnectTime(),
 		im:                 im,
 	}
-	//rpc := DefaultRPC(httpRequestManager.nodes...)
-	//	rpc.im = im
-	//	txVersion, err := rpc.GetTxVersion()
-	//	if err != nil {
-	//		logger.Infof("get txVersion err:%v", err)
-	//		txVersion = DefaultTxVersion
-	//	}
-	//	TxVersion = txVersion
-	//
-	//	logger.Info("set TxVersion to " + TxVersion)
+
 	txVersion, err := rpc.GetTxVersion()
 	if err != nil {
 		logger.Info("use config txVersion, for", err.Error())
-		txVersion = version
+		txVersion = cf.GetTxVersion()
 	}
 	TxVersion = txVersion
 	rpc.txVersion = txVersion
@@ -196,8 +161,8 @@ func NewRPCWithPath(confRootPath string) *RPC {
 	return rpc
 }
 
-func newInspectorManager(vip *viper.Viper, confRootPath string) (im *inspectorManager) {
-	inspectorEnable := vip.GetBool(common.InspectorEnable)
+func newInspectorManager(cf *config.Config, confRootPath string) (im *inspectorManager) {
+	inspectorEnable := cf.IsInspectorEnable()
 	logger.Debugf("[CONFIG]: %s = %v", common.InspectorEnable, inspectorEnable)
 
 	im = &inspectorManager{
@@ -208,7 +173,7 @@ func newInspectorManager(vip *viper.Viper, confRootPath string) (im *inspectorMa
 		return
 	}
 
-	accountPath := strings.Join([]string{confRootPath, vip.GetString(common.InspectorAccountPath)}, "/")
+	accountPath := strings.Join([]string{confRootPath, cf.GetInspectorDefaultAccount()}, "/")
 	logger.Debugf("[CONFIG]: %s = %v", common.InspectorAccountPath, accountPath)
 
 	data, err := ioutil.ReadFile(accountPath)
@@ -217,7 +182,7 @@ func newInspectorManager(vip *viper.Viper, confRootPath string) (im *inspectorMa
 		return
 	}
 
-	accountType := vip.GetString(common.InspectorAccountType)
+	accountType := cf.GetInspectorAccountType()
 	logger.Debugf("[CONFIG]: %s = %v", common.InspectorAccountType, accountType)
 
 	var key account.Key
@@ -256,6 +221,7 @@ func DefaultRPC(nodes ...*Node) *RPC {
 		reConnTime:         DefaultReConnectTime,
 		hrm:                *defaultHTTPRequestManager(),
 		txVersion:          DefaultTxVersion,
+		config:             config.Default(),
 	}
 	rpc.hrm.nodes = nodes
 
@@ -311,13 +277,11 @@ func (rpc *RPC) ReConnTime(rct int64) *RPC {
 
 // Https use sets the https related options
 func (rpc *RPC) Https(tlscaPath, tlspeerCertPath, tlspeerPrivPath string) *RPC {
-	vip := viper.New()
-	vip.Set(common.SecurityHttps, true)
-	vip.Set(common.SecurityTlsca, tlscaPath)
-	vip.Set(common.SecurityTlspeerCert, tlspeerCertPath)
-	vip.Set(common.SecurityTlspeerPriv, tlspeerPrivPath)
-
-	rpc.hrm.client = newHTTPClient(vip, ".")
+	rpc.config.SetIsHttps(true)
+	rpc.config.SetTlscaPath(tlscaPath)
+	rpc.config.SetTlspeerCertPath(tlspeerCertPath)
+	rpc.config.SetTlspeerPrivPath(tlspeerPrivPath)
+	rpc.hrm.client = newHTTPClient(rpc.config, ".")
 	rpc.hrm.isHTTP = true
 
 	for i := 0; i < len(rpc.hrm.nodes); i++ {
@@ -2590,7 +2554,6 @@ func (rpc *RPC) GetAccountProof(account string) (*AccountProofPath, StdError) {
 
 func Validate(account string, path *AccountProofPath) bool {
 	b := common.Hex2Bytes(account)
-
 	addr := common.BytesToAddress(b)
 	return types.Validate(addr.Bytes(), path.AccountProof)
 }

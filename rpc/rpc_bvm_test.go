@@ -16,7 +16,7 @@ import (
 var notAdminAddress = "0x2a307e1e5b53863242a465bf99ca6e94947da898"
 var managerRole = "manager"
 var pwd = "123456"
-var config = `
+var cf = `
 [filter]
     enable = false
     [[filter.rules]]
@@ -208,7 +208,7 @@ func TestRPC_BVMCreateConfigProposal(t *testing.T) {
 	t.Skip()
 	key, err := account.NewAccountFromAccountJSON("", pwd)
 	assert.Nil(t, err)
-	operation, _ := bvm.NewProposalCreateOperationForConfig([]byte(config))
+	operation, _ := bvm.NewProposalCreateOperationForConfig([]byte(cf))
 	payload := bvm.EncodeOperation(operation)
 	tx := NewTransaction(key.GetAddress().Hex()).Invoke(operation.Address(), payload).VMType(BVM)
 	tx.Sign(key)
@@ -221,7 +221,7 @@ func TestRPC_BVMConfigProposal(t *testing.T) {
 	t.Skip()
 	key, err := account.NewAccountFromAccountJSON("", pwd)
 	assert.Nil(t, err)
-	operation, _ := bvm.NewProposalCreateOperationForConfig([]byte(config))
+	operation, _ := bvm.NewProposalCreateOperationForConfig([]byte(cf))
 	payload := bvm.EncodeOperation(operation)
 	fmt.Println(payload)
 	tx := NewTransaction(key.GetAddress().Hex()).Invoke(operation.Address(), payload).VMType(BVM)
@@ -527,7 +527,7 @@ func TestRPC_BVMStateChange1(t *testing.T) {
 	// 3. create another proposal
 	// 4. cancel another proposal
 	var proposal bvm.ProposalData
-	config := `
+	cf := `
 [consensus]
   [consensus.pool]
     batch_size = 20
@@ -536,7 +536,7 @@ func TestRPC_BVMStateChange1(t *testing.T) {
 	t.Run("step1_create_proposal", func(t *testing.T) {
 		key, err := account.NewAccountFromAccountJSON("", pwd)
 		assert.NoError(t, err)
-		operation, _ := bvm.NewProposalCreateOperationForConfig([]byte(config))
+		operation, _ := bvm.NewProposalCreateOperationForConfig([]byte(cf))
 		payload := bvm.EncodeOperation(operation)
 		tx := NewTransaction(key.GetAddress().Hex()).Invoke(operation.Address(), payload).VMType(BVM)
 		tx.Sign(key)
@@ -567,7 +567,7 @@ func TestRPC_BVMStateChange1(t *testing.T) {
 	t.Run("step3_create_another_proposal", func(t *testing.T) {
 		key, err := account.NewAccountFromAccountJSON("", pwd)
 		assert.NoError(t, err)
-		operation, _ := bvm.NewProposalCreateOperationForConfig([]byte(config))
+		operation, _ := bvm.NewProposalCreateOperationForConfig([]byte(cf))
 		payload := bvm.EncodeOperation(operation)
 		tx := NewTransaction(key.GetAddress().Hex()).Invoke(operation.Address(), payload).VMType(BVM)
 		tx.Sign(key)
@@ -606,7 +606,7 @@ func TestRPC_BVMStateChange2(t *testing.T) {
 	// 2. vote
 	// 3. execute and query
 	var proposal bvm.ProposalData
-	config := `
+	cf := `
 [consensus]
   [consensus.pool]
     batch_size = 30
@@ -615,7 +615,7 @@ func TestRPC_BVMStateChange2(t *testing.T) {
 	t.Run("step1_create_proposal", func(t *testing.T) {
 		key, err := account.NewAccountFromAccountJSON("", pwd)
 		assert.NoError(t, err)
-		operation, _ := bvm.NewProposalCreateOperationForConfig([]byte(config))
+		operation, _ := bvm.NewProposalCreateOperationForConfig([]byte(cf))
 		payload := bvm.EncodeOperation(operation)
 		fmt.Println(payload)
 		tx := NewTransaction(key.GetAddress().Hex()).Invoke(operation.Address(), payload).VMType(BVM)
@@ -661,7 +661,7 @@ func TestRPC_BVMStateChange2(t *testing.T) {
 		t.Log(proposal)
 		conf, err := rpc.GetConfig()
 		assert.NoError(t, err)
-		CheckConfig(t, config, conf)
+		CheckConfig(t, cf, conf)
 		t.Log(conf)
 		p, err := rpc.GetProposal()
 		assert.NoError(t, err)
@@ -680,7 +680,7 @@ func TestRPC_BVMStateChange3(t *testing.T) {
 	t.Run("step1_create_proposal", func(t *testing.T) {
 		key, err := account.NewAccountFromAccountJSON("", pwd)
 		assert.NoError(t, err)
-		operation, _ := bvm.NewProposalCreateOperationForConfig([]byte(config))
+		operation, _ := bvm.NewProposalCreateOperationForConfig([]byte(cf))
 		payload := bvm.EncodeOperation(operation)
 		fmt.Println(payload)
 		tx := NewTransaction(key.GetAddress().Hex()).Invoke(operation.Address(), payload).VMType(BVM)
@@ -742,7 +742,7 @@ func TestRPC_BVMStateChange4(t *testing.T) {
 	t.Run("step1_create_proposal", func(t *testing.T) {
 		key, err := account.NewAccountFromAccountJSON("", pwd)
 		assert.NoError(t, err)
-		operation, _ := bvm.NewProposalCreateOperationForConfig([]byte(config))
+		operation, _ := bvm.NewProposalCreateOperationForConfig([]byte(cf))
 		payload := bvm.EncodeOperation(operation)
 		fmt.Println(payload)
 		tx := NewTransaction(key.GetAddress().Hex()).Invoke(operation.Address(), payload).VMType(BVM)
@@ -802,7 +802,7 @@ func TestRPC_BVMStateChange5(t *testing.T) {
 	t.Run("step1_create_proposal", func(t *testing.T) {
 		key, err := account.NewAccountFromAccountJSON("", pwd)
 		assert.NoError(t, err)
-		operation, _ := bvm.NewProposalCreateOperationForConfig([]byte(config))
+		operation, _ := bvm.NewProposalCreateOperationForConfig([]byte(cf))
 		payload := bvm.EncodeOperation(operation)
 		fmt.Println(payload)
 		tx := NewTransaction(key.GetAddress().Hex()).Invoke(operation.Address(), payload).VMType(BVM)
@@ -838,7 +838,7 @@ func TestRPC_BVMStateChange5(t *testing.T) {
 	t.Run("step3_create_another_proposal", func(t *testing.T) {
 		key, err := account.NewAccountFromAccountJSON("", pwd)
 		assert.NoError(t, err)
-		operation, _ := bvm.NewProposalCreateOperationForConfig([]byte(config))
+		operation, _ := bvm.NewProposalCreateOperationForConfig([]byte(cf))
 		payload := bvm.EncodeOperation(operation)
 		fmt.Println(payload)
 		tx := NewTransaction(key.GetAddress().Hex()).Invoke(operation.Address(), payload).VMType(BVM)
@@ -883,7 +883,7 @@ func TestRPC_BVMStateChange6(t *testing.T) {
 	t.Run("step1_create_proposal", func(t *testing.T) {
 		key, err := account.NewAccountFromAccountJSON("", pwd)
 		assert.NoError(t, err)
-		operation, _ := bvm.NewProposalCreateOperationForConfig([]byte(config))
+		operation, _ := bvm.NewProposalCreateOperationForConfig([]byte(cf))
 		payload := bvm.EncodeOperation(operation)
 		fmt.Println(payload)
 		tx := NewTransaction(key.GetAddress().Hex()).Invoke(operation.Address(), payload).VMType(BVM)
@@ -915,7 +915,7 @@ func TestRPC_BVMStateChange6(t *testing.T) {
 	t.Run("step3_create_another_proposal", func(t *testing.T) {
 		key, err := account.NewAccountFromAccountJSON("", pwd)
 		assert.NoError(t, err)
-		operation, _ := bvm.NewProposalCreateOperationForConfig([]byte(config))
+		operation, _ := bvm.NewProposalCreateOperationForConfig([]byte(cf))
 		payload := bvm.EncodeOperation(operation)
 		fmt.Println(payload)
 		tx := NewTransaction(key.GetAddress().Hex()).Invoke(operation.Address(), payload).VMType(BVM)
@@ -942,7 +942,7 @@ func TestRPC_BVMCreateProposal1(t *testing.T) {
 	t.Run("step1_create_proposal", func(t *testing.T) {
 		key, err := account.NewAccountFromAccountJSON("", pwd)
 		assert.NoError(t, err)
-		operation, _ := bvm.NewProposalCreateOperationForConfig([]byte(config))
+		operation, _ := bvm.NewProposalCreateOperationForConfig([]byte(cf))
 		payload := bvm.EncodeOperation(operation)
 		tx := NewTransaction(key.GetAddress().Hex()).Invoke(operation.Address(), payload).VMType(BVM)
 		tx.Sign(key)
@@ -982,7 +982,7 @@ func TestRPC_BVMCreateProposal2(t *testing.T) {
 		assert.NoError(t, err)
 		key, err := account.GenKeyFromAccountJson(nonAdminAcc, pwd)
 		assert.NoError(t, err)
-		operation, _ := bvm.NewProposalCreateOperationForConfig([]byte(config))
+		operation, _ := bvm.NewProposalCreateOperationForConfig([]byte(cf))
 		payload := bvm.EncodeOperation(operation)
 		tx := NewTransaction(key.(account.Key).GetAddress().Hex()).Invoke(operation.Address(), payload).VMType(BVM)
 		tx.Sign(key)
@@ -1001,7 +1001,7 @@ func TestRPC_BVMExecution1(t *testing.T) {
 	// 2. vote
 	// 3. execute and query
 	var proposal bvm.ProposalData
-	config := `
+	cf := `
 [proposal]
 	timeout   = "15m"
 	threshold = 3
@@ -1009,7 +1009,7 @@ func TestRPC_BVMExecution1(t *testing.T) {
 	t.Run("step1_create_proposal", func(t *testing.T) {
 		key, err := account.NewAccountFromAccountJSON("", pwd)
 		assert.NoError(t, err)
-		operation, _ := bvm.NewProposalCreateOperationForConfig([]byte(config))
+		operation, _ := bvm.NewProposalCreateOperationForConfig([]byte(cf))
 		payload := bvm.EncodeOperation(operation)
 		fmt.Println(payload)
 		tx := NewTransaction(key.GetAddress().Hex()).Invoke(operation.Address(), payload).VMType(BVM)
@@ -1055,7 +1055,7 @@ func TestRPC_BVMExecution1(t *testing.T) {
 		t.Log(proposal)
 		conf, err := rpc.GetConfig()
 		assert.NoError(t, err)
-		CheckConfig(t, config, conf)
+		CheckConfig(t, cf, conf)
 		t.Log(conf)
 		p, err := rpc.GetProposal()
 		assert.NoError(t, err)
@@ -1075,7 +1075,7 @@ func TestRPC_BVMExecution2(t *testing.T) {
 	t.Run("step1_create_proposal", func(t *testing.T) {
 		key, err := account.NewAccountFromAccountJSON("", pwd)
 		assert.NoError(t, err)
-		operation, _ := bvm.NewProposalCreateOperationForConfig([]byte(config))
+		operation, _ := bvm.NewProposalCreateOperationForConfig([]byte(cf))
 		payload := bvm.EncodeOperation(operation)
 		fmt.Println(payload)
 		tx := NewTransaction(key.GetAddress().Hex()).Invoke(operation.Address(), payload).VMType(BVM)
@@ -1121,7 +1121,7 @@ func TestRPC_BVMExecution2(t *testing.T) {
 		t.Log(proposal)
 		conf, err := rpc.GetConfig()
 		assert.NoError(t, err)
-		CheckConfig(t, config, conf)
+		CheckConfig(t, cf, conf)
 		t.Log(conf)
 		p, err := rpc.GetProposal()
 		assert.NoError(t, err)
@@ -1155,7 +1155,7 @@ func TestRPC_BVMCancel1(t *testing.T) {
 	t.Run("step1_create_proposal", func(t *testing.T) {
 		key, err := account.NewAccountFromAccountJSON("", pwd)
 		assert.NoError(t, err)
-		operation, _ := bvm.NewProposalCreateOperationForConfig([]byte(config))
+		operation, _ := bvm.NewProposalCreateOperationForConfig([]byte(cf))
 		payload := bvm.EncodeOperation(operation)
 		fmt.Println(payload)
 		tx := NewTransaction(key.GetAddress().Hex()).Invoke(operation.Address(), payload).VMType(BVM)
@@ -1196,7 +1196,7 @@ func TestRPC_BVMCancel2(t *testing.T) {
 	t.Run("step1_create_proposal", func(t *testing.T) {
 		key, err := account.NewAccountFromAccountJSON("", pwd)
 		assert.NoError(t, err)
-		operation, _ := bvm.NewProposalCreateOperationForConfig([]byte(config))
+		operation, _ := bvm.NewProposalCreateOperationForConfig([]byte(cf))
 		payload := bvm.EncodeOperation(operation)
 		fmt.Println(payload)
 		tx := NewTransaction(key.GetAddress().Hex()).Invoke(operation.Address(), payload).VMType(BVM)
