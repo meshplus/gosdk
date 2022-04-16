@@ -47,7 +47,7 @@ reConnectTime = 10000
 
 [security]
     #Use Https
-    https = true
+    https = false
     #If https is true, you shoule add follow properties
     #the paths followed are relative to conf root path
     tlsca = "certs/tls/tlsca.ca"
