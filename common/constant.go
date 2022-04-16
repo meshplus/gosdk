@@ -21,6 +21,10 @@ const (
 )
 
 const (
+	GrpcPorts = "grpc.ports"
+)
+
+const (
 	PollingResendTime            = "polling.resendTime"
 	PollingFirstPollingInterval  = "polling.firstPollingInterval"
 	PollingFirstPollingTimes     = "polling.firstPollingTimes"
@@ -53,6 +57,11 @@ const (
 const (
 	MaxIdleConns        = "transport.maxIdleConns"
 	MaxIdleConnsPerHost = "transport.maxIdleConnsPerHost"
+	DailTimeout         = "transport.dailTimeout"
+	MaxLifetime         = "transport.maxLifetime"
+	MaxStreamLifetime   = "transport.maxStreamLifeTime"
+	MaxSendMsgSize      = "transport.maxSendMsgSize"
+	MaxRecvMsgSize      = "transport.maxRecvMsgSize"
 )
 
 const (

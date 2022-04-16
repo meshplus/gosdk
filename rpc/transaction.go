@@ -228,6 +228,7 @@ func (t *Transaction) Transfer(to string, value int64) *Transaction {
 	t.value = value
 	t.to = chPrefix(to)
 	t.isValue = true
+	t.vmType = string(TRANSFER)
 	return t
 }
 

@@ -3,6 +3,7 @@ package bvm
 import (
 	"encoding/hex"
 	"encoding/json"
+	"github.com/meshplus/gosdk/common/bvmcom"
 	"strconv"
 )
 
@@ -36,8 +37,15 @@ const (
 	// PermissionRevoke permission contract method `Revoke`
 	PermissionRevoke ContractMethod = "Revoke"
 
+	// CASetCAMode ca contract method `SetCAMode`
+	CASetCAMode ContractMethod = "SetCAMode"
+	// CAGetCAMode ca contract method `GetCAMode`
+	CAGetCAMode ContractMethod = "GetCAMode"
+
 	// ProposalCreate proposal contract method `Create`
 	ProposalCreate ContractMethod = "Create"
+	// ProposalDirect proposal contract method `Direct`
+	ProposalDirect ContractMethod = "Direct"
 	// ProposalVote proposal contract method `Vote`
 	ProposalVote ContractMethod = "Vote"
 	// ProposalGrant proposal contract method `Cancel`
@@ -67,11 +75,32 @@ const (
 	//CertUnfreeze cert contract method `CertUnfreeze`
 	CertUnfreeze ContractMethod = "CertUnfreeze"
 
-	accountAddress  = "0x0000000000000000000000000000000000ffff04"
-	proposalAddress = "0x0000000000000000000000000000000000ffff02"
-	hashAddress     = "0x0000000000000000000000000000000000ffff01"
-	certAddress     = "0x0000000000000000000000000000000000ffff05"
-	didAddress      = "0x0000000000000000000000000000000000ffff06"
+	SRSInfo    ContractMethod = "GetSRSInfo"
+	SRSBeacon  ContractMethod = "Beacon"
+	SRSHistory ContractMethod = "GetHistory"
+
+	AddRootCA  ContractMethod = "AddRootCA"
+	GetRootCAs ContractMethod = "GetRootCAs"
+
+	RegisterAnchor   ContractMethod = "RegisterAnchorNode"
+	UnRegisterAnchor ContractMethod = "UnregisterAnchorNode"
+	ReplaceAnchor    ContractMethod = "ReplaceAnchorNode"
+	ReadCrossChain   ContractMethod = "ReadCrossChainTransaction"
+	ReadAnchor       ContractMethod = "ReadAnchorStatus"
+	Timeout          ContractMethod = "Timeout"
+
+	accountAddress      = "0x0000000000000000000000000000000000ffff04"
+	proposalAddress     = "0x0000000000000000000000000000000000ffff02"
+	hashAddress         = "0x0000000000000000000000000000000000ffff01"
+	certAddress         = "0x0000000000000000000000000000000000ffff05"
+	didAddress          = "0x0000000000000000000000000000000000ffff06"
+	NormalAnchorAddress = "0x0000000000000000000000000000000000ffff08"
+	mpcAddress          = "0x0000000000000000000000000000000000ffff09"
+	SystemAnchorAddress = "0x0000000000000000000000000000000000ffff0a"
+	rootCAAddress       = "0x0000000000000000000000000000000000ffff0b"
+
+	// GenesisInfoKey the key for store genesis info in state db.
+	genesisInfoKey = "the_key_for_genesis_info"
 )
 
 // ProposalType proposal type
@@ -88,6 +117,8 @@ const (
 	ProposalTypeCNS
 	// ProposalTypeContract proposal of contract type
 	ProposalTypeContract
+	// ProposalTypeCA proposal of ca type
+	ProposalTypeCA
 )
 
 func (pt ProposalType) String() string {
@@ -102,6 +133,8 @@ func (pt ProposalType) String() string {
 		return "CNS"
 	case ProposalTypeContract:
 		return "CONTRACT"
+	case ProposalTypeCA:
+		return "CA"
 	default:
 		return "unknown proposal type"
 	}
@@ -153,6 +186,22 @@ func (po *CertOperationImpl) Address() string {
 	return certAddress
 }
 
+type MPCOperationImpl struct {
+	operationImpl
+}
+
+func (mo *MPCOperationImpl) Address() string {
+	return mpcAddress
+}
+
+type RootCAOperationImpl struct {
+	operationImpl
+}
+
+func (ro *RootCAOperationImpl) Address() string {
+	return rootCAAddress
+}
+
 type ProposalContentOperation interface {
 	Operation
 	ProposalType()
@@ -169,6 +218,19 @@ type permissionOperationImpl struct {
 
 func (po *permissionOperationImpl) ProposalType()   {}
 func (po *permissionOperationImpl) PermissionType() {}
+
+type CAOperation interface {
+	ProposalContentOperation
+	CAType()
+}
+
+type caOperationImpl struct {
+	operationImpl
+}
+
+func (co *caOperationImpl) ProposalType() {}
+
+func (co *caOperationImpl) CAType() {}
 
 type NodeOperation interface {
 	ProposalContentOperation
@@ -219,6 +281,22 @@ func (did *DIDOperationImpl) Address() string {
 	return didAddress
 }
 
+type NormalAnchorOperationImpl struct {
+	operationImpl
+}
+
+func (no *NormalAnchorOperationImpl) Address() string {
+	return NormalAnchorAddress
+}
+
+type SystemAnchorOperationImpl struct {
+	operationImpl
+}
+
+func (ao *SystemAnchorOperationImpl) Address() string {
+	return SystemAnchorAddress
+}
+
 // NewProposalCreateOperationForContract new proposal create operation for contract operation
 func NewProposalCreateOperationForContract(ops ...ContractOperation) BuiltinOperation {
 	data := encodeProposalContentOperation(convertToProposalContentOperations(ops))
@@ -235,6 +313,24 @@ func NewProposalCreateOperationForCNS(ops ...CNSOperation) BuiltinOperation {
 func NewProposalCreateOperationForNode(ops ...NodeOperation) BuiltinOperation {
 	data := encodeProposalContentOperation(convertToProposalContentOperations(ops))
 	return newProposalCreateOperation(data, ProposalTypeNode)
+}
+
+// NewProposalCreateOperationForCA new proposal create operation for ca mode operation
+func NewProposalCreateOperationForCA(ops ...CAOperation) BuiltinOperation {
+	data := encodeProposalContentOperation(convertToProposalContentOperations(ops))
+	return newProposalCreateOperation(data, ProposalTypeCA)
+}
+
+// NewProposalDirectOperationForNode new proposal direct operation for node operation
+func NewProposalDirectOperationForNode(ops ...NodeOperation) BuiltinOperation {
+	data := encodeProposalContentOperation(convertToProposalContentOperations(ops))
+	return newProposalDirectOperation(data, ProposalTypeNode)
+}
+
+// NewProposalDirectOperationForCA new proposal direct operation for ca mode operation
+func NewProposalDirectOperationForCA(ops ...CAOperation) BuiltinOperation {
+	data := encodeProposalContentOperation(convertToProposalContentOperations(ops))
+	return newProposalDirectOperation(data, ProposalTypeCA)
 }
 
 // convertToProposalContentOperations convert the slice of ProposalContentOperations's drive interface to ProposalContentOperations
@@ -263,6 +359,10 @@ func convertToProposalContentOperations(item interface{}) []ProposalContentOpera
 		for _, op := range ops {
 			operations = append(operations, op)
 		}
+	case []CAOperation:
+		for _, op := range ops {
+			operations = append(operations, op)
+		}
 	}
 	return operations
 }
@@ -276,6 +376,11 @@ func NewProposalCreateOperationForPermission(ops ...PermissionOperation) Builtin
 // NewProposalCreateOperation create a new ProposalCreate operation and return
 func newProposalCreateOperation(data []byte, pType ProposalType) *ProposalOperationImpl {
 	return newProposalOperation(ProposalCreate, string(data), pType.String())
+}
+
+// NewProposalCreateOperation create a new ProposalCreate operation and return
+func newProposalDirectOperation(data []byte, pType ProposalType) *ProposalOperationImpl {
+	return newProposalOperation(ProposalDirect, string(data), pType.String())
 }
 
 func newProposalOperation(method ContractMethod, args ...string) *ProposalOperationImpl {
@@ -319,6 +424,22 @@ func NewPermissionGrantOperation(role string, address string) PermissionOperatio
 // NewPermissionRevokeOperation create a new PermissionRevoke operation and return
 func NewPermissionRevokeOperation(role string, address string) PermissionOperation {
 	return newPermissionOperation(PermissionRevoke, role, address)
+}
+
+func newCAOperation(method ContractMethod, args ...string) CAOperation {
+	return &caOperationImpl{operationImpl{method: method, args: args}}
+}
+
+func NewCASetCAModeOperation(mode string) (CAOperation, error) {
+	caMode, err := bvmcom.ConvertCAMode(mode)
+	if err != nil {
+		return nil, err
+	}
+	return newCAOperation(CASetCAMode, intToString(int(caMode))), nil
+}
+
+func NewCAGetCAModeOperation() CAOperation {
+	return newCAOperation(CAGetCAMode)
 }
 
 func newNodeOperation(method ContractMethod, args ...string) NodeOperation {
@@ -419,6 +540,12 @@ func newHashOperation(method ContractMethod, args ...string) *HashOperationImpl 
 	return &HashOperationImpl{operationImpl{method: method, args: args}}
 }
 
+// NewSetGenesisInfoForHpcOperation create a new HashGenesisInfo operation for hyperchain and return
+func NewSetGenesisInfoForHpcOperation(genesisInfo *GenesisInfo) BuiltinOperation {
+	genesisBytes, _ := json.Marshal(genesisInfo)
+	return newHashOperation(HashSet, genesisInfoKey, string(genesisBytes))
+}
+
 // NewHashSetOperation create a new HashSet operation and return
 func NewHashSetOperation(key, value string) BuiltinOperation {
 	return newHashOperation(HashSet, key, value)
@@ -447,8 +574,39 @@ func newCertOperation(method ContractMethod, args ...string) *CertOperationImpl 
 	return &CertOperationImpl{operationImpl{method: method, args: args}}
 }
 
+func newMPCOperation(method ContractMethod, args ...string) *MPCOperationImpl {
+	return &MPCOperationImpl{operationImpl{method: method, args: args}}
+}
+
+func newRootCAOperation(method ContractMethod, args ...string) *RootCAOperationImpl {
+	return &RootCAOperationImpl{operationImpl{method: method, args: args}}
+}
+
+func NewMPCInfoOperation(tag, ct string) BuiltinOperation {
+	return newMPCOperation(SRSInfo, tag, ct)
+}
+
+func NewMPCBeaconOperation(ptau []byte) BuiltinOperation {
+	return newMPCOperation(SRSBeacon, hex.EncodeToString(ptau))
+}
+
+func NewMPCHistoryOperation(ct string) BuiltinOperation {
+	return newMPCOperation(SRSHistory, ct)
+}
+
+func NewRootCAAddOperation(rootCA string) BuiltinOperation {
+	return newRootCAOperation(AddRootCA, rootCA)
+}
+
+func NewRootCAGetOperation() BuiltinOperation {
+	return newRootCAOperation(GetRootCAs)
+}
+
 // NewCertRevokeOperation create a new CertRevoke operation and return
 func NewCertRevokeOperation(cert, priv []byte) (BuiltinOperation, error) {
+	if priv == nil {
+		return newCertOperation(CertRevoke, string(cert), "", ""), nil
+	}
 	msg := "revoke"
 	sign := []byte(msg)
 	if priv != nil {
@@ -507,6 +665,18 @@ func NewCertCheckOperation(cert []byte) BuiltinOperation {
 func NewDIDSetChainIDOperation(chainID string) BuiltinOperation {
 	return &DIDOperationImpl{
 		operationImpl{method: SetchainID, args: []string{chainID}},
+	}
+}
+
+func NewNormalAnchorOperation(method ContractMethod, args []string) BuiltinOperation {
+	return &NormalAnchorOperationImpl{
+		operationImpl{method: method, args: args},
+	}
+}
+
+func NewSystemAnchorOperation(method ContractMethod, args ...string) BuiltinOperation {
+	return &SystemAnchorOperationImpl{
+		operationImpl{method: method, args: args},
 	}
 }
 

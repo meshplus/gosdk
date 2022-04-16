@@ -84,3 +84,7 @@ func NewTCertManager(vip *viper.Viper, confRootPath string) *TCertManager {
 func (tcm *TCertManager) GetECert() string {
 	return tcm.ecert
 }
+
+func (tcm *TCertManager) GetSDKCert() *bvm.KeyPair {
+	return tcm.sdkCert
+}

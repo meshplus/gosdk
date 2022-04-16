@@ -29,6 +29,18 @@ type NsFilterRule struct {
 	VM []string `json:"vm" mapstructure:"vm"`
 }
 
+// GenesisNode define the filed for genesis node.
+type GenesisNode struct {
+	Hostname    string `json:"genesisNode" mapstructure:"genesisNode"`
+	CertContent string `json:"certContent" mapstructure:"certContent"`
+}
+
+// GenesisInfo define the filed in genesis info.
+type GenesisInfo struct {
+	GenesisAccount map[string]string `json:"genesisAccount,omitempty"`
+	GenesisNodes   []*GenesisNode    `json:"genesisNodes,omitempty"`
+}
+
 // ContractManagerOptions contract options
 // vmType must have value
 // when call DeployContract, source, bin must have value yet

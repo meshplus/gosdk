@@ -180,7 +180,7 @@ func newHTTPClient(cf *config.Config, confRootPath string) *http.Client {
 		tr.TLSClientConfig = &tls.Config{
 			RootCAs:      pool,
 			Certificates: []tls.Certificate{cliCrt},
-			ServerName:   "hyperchain.cn",
+			ServerName:   cf.GetTlsDomain(),
 		}
 	}
 
