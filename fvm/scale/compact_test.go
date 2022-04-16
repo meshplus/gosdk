@@ -1,7 +1,7 @@
 package scale
 
 import (
-	"github.com/hyperchain/gosdk/common"
+	"github.com/meshplus/gosdk/common"
 	"github.com/stretchr/testify/assert"
 	"math/big"
 	"testing"

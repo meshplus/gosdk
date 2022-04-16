@@ -13,6 +13,7 @@ import (
 )
 
 func TestDeploy(t *testing.T) {
+	t.Skip()
 	rp := rpc.NewRPCWithPath("../../conf")
 	wasmPath1 := "./wasm/SetHash-gc.wasm"
 	buf, err := ioutil.ReadFile(wasmPath1)
@@ -56,6 +57,7 @@ func TestDeploy(t *testing.T) {
 }
 
 func TestDemo(t *testing.T) {
+	t.Skip()
 	const currentABI = `{
   "contract": {
     "name": "SetHash",

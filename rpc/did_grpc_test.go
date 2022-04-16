@@ -19,6 +19,7 @@ func iniDID(t *testing.T) {
 }
 
 func TestDidGrpc_SendDIDTransaction(t *testing.T) {
+	t.Skip()
 	iniDID(t)
 	g := NewGRPC()
 	tg, err := g.NewDidGrpc(ClientOption{
@@ -44,6 +45,7 @@ func TestDidGrpc_SendDIDTransaction(t *testing.T) {
 }
 
 func TestDidGrpc_SendDIDTransactionReturnReceipt(t *testing.T) {
+	t.Skip()
 	iniDID(t)
 	g := NewGRPC()
 	tg, err := g.NewDidGrpc(ClientOption{

@@ -9,12 +9,9 @@ import (
 	"testing"
 )
 
-var (
-	gRpc = NewGRPC(BindNodes(0))
-)
-
 func TestTransactionGrpc_SendTransaction(t *testing.T) {
-	tg, err := gRpc.NewTransactionGrpc(ClientOption{
+	t.Skip()
+	tg, err := NewGRPC(BindNodes(0)).NewTransactionGrpc(ClientOption{
 		StreamNumber: 1,
 	})
 	assert.Nil(t, err)
@@ -39,7 +36,8 @@ func TestTransactionGrpc_SendTransaction(t *testing.T) {
 }
 
 func TestTransactionGrpc_SendTransactionTLS(t *testing.T) {
-	tg, err := gRpc.NewTransactionGrpc(ClientOption{
+	t.Skip()
+	tg, err := NewGRPC(BindNodes(0)).NewTransactionGrpc(ClientOption{
 		StreamNumber: 1,
 	})
 	assert.Nil(t, err)
@@ -64,7 +62,8 @@ func TestTransactionGrpc_SendTransactionTLS(t *testing.T) {
 }
 
 func TestTransactionGrpc_SendTransaction2(t *testing.T) {
-	tg, err := gRpc.NewTransactionGrpc(ClientOption{
+	t.Skip()
+	tg, err := NewGRPC(BindNodes(0)).NewTransactionGrpc(ClientOption{
 		StreamNumber: 1,
 	})
 	assert.Nil(t, err)
@@ -88,7 +87,8 @@ func TestTransactionGrpc_SendTransaction2(t *testing.T) {
 }
 
 func TestTransactionGrpc_SendTransactionReturnReceipt(t *testing.T) {
-	tg, err := gRpc.NewTransactionGrpc(ClientOption{
+	t.Skip()
+	tg, err := NewGRPC(BindNodes(0)).NewTransactionGrpc(ClientOption{
 		StreamNumber: 1,
 	})
 	assert.Nil(t, err)
@@ -113,7 +113,7 @@ func TestTransactionGrpc_SendTransactionReturnReceipt(t *testing.T) {
 
 // BenchmarkSendTransaction-8   	    1270	    829267 ns/op
 func BenchmarkSendTransaction(b *testing.B) {
-
+	b.Skip()
 	guomiPri := "6153af264daa4763490f2a51c9d13417ef9f579229be2141574eb339ee9b9d2a"
 	pri := new(gm.SM2PrivateKey)
 	pri.FromBytes(common.FromHex(guomiPri), 0)
@@ -124,7 +124,7 @@ func BenchmarkSendTransaction(b *testing.B) {
 		},
 	}
 
-	tg, err := gRpc.NewTransactionGrpc(ClientOption{
+	tg, err := NewGRPC(BindNodes(0)).NewTransactionGrpc(ClientOption{
 		StreamNumber: 10,
 	})
 	assert.Nil(b, err)
@@ -141,6 +141,7 @@ func BenchmarkSendTransaction(b *testing.B) {
 
 // BenchmarkSendTransaction2-8   	    1314	   1011307 ns/op
 func BenchmarkSendTransaction2(b *testing.B) {
+	b.Skip()
 	guomiPri := "6153af264daa4763490f2a51c9d13417ef9f579229be2141574eb339ee9b9d2a"
 	pri := new(gm.SM2PrivateKey)
 	pri.FromBytes(common.FromHex(guomiPri), 0)
@@ -151,7 +152,7 @@ func BenchmarkSendTransaction2(b *testing.B) {
 		},
 	}
 
-	tg, err := gRpc.NewTransactionGrpc(ClientOption{
+	tg, err := NewGRPC(BindNodes(0)).NewTransactionGrpc(ClientOption{
 		StreamNumber: 1,
 	})
 	assert.Nil(b, err)
@@ -169,7 +170,8 @@ func BenchmarkSendTransaction2(b *testing.B) {
 
 // BenchmarkSendTransactionReturnReceipt-8   	       2	 501816208 ns/op
 func BenchmarkSendTransactionReturnReceipt(b *testing.B) {
-	tg, err := gRpc.NewTransactionGrpc(ClientOption{
+	b.Skip()
+	tg, err := NewGRPC(BindNodes(0)).NewTransactionGrpc(ClientOption{
 		StreamNumber: 10,
 	})
 	assert.Nil(b, err)
@@ -195,7 +197,8 @@ func BenchmarkSendTransactionReturnReceipt(b *testing.B) {
 }
 
 func TestSyncGo(t *testing.T) {
-	tg, err := gRpc.NewTransactionGrpc(ClientOption{
+	t.Skip()
+	tg, err := NewGRPC(BindNodes(0)).NewTransactionGrpc(ClientOption{
 		StreamNumber: 10,
 	})
 	assert.Nil(t, err)
@@ -229,7 +232,8 @@ func TestSyncGo(t *testing.T) {
 
 // BenchmarkSendTransactionReturnReceipt2-8   	       3	 499972806 ns/op
 func BenchmarkSendTransactionReturnReceipt2(b *testing.B) {
-	tg, err := gRpc.NewTransactionGrpc(ClientOption{
+	b.Skip()
+	tg, err := NewGRPC(BindNodes(0)).NewTransactionGrpc(ClientOption{
 		StreamNumber: 1,
 	})
 	assert.Nil(b, err)

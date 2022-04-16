@@ -13,6 +13,7 @@ import (
 )
 
 func TestContractGrpc_DeployContract(t *testing.T) {
+	t.Skip()
 	g := NewGRPC()
 	tg, err := g.NewContractGrpc(ClientOption{
 		StreamNumber: 1,
@@ -39,6 +40,7 @@ func TestContractGrpc_DeployContract(t *testing.T) {
 }
 
 func TestContractGrpc_DeployContractReturnReceipt(t *testing.T) {
+	t.Skip()
 	g := NewGRPC()
 	tg, err := g.NewContractGrpc(ClientOption{
 		StreamNumber: 1,
@@ -65,6 +67,7 @@ func TestContractGrpc_DeployContractReturnReceipt(t *testing.T) {
 }
 
 func TestContractGrpc_InvokeContract(t *testing.T) {
+	t.Skip()
 	g := NewGRPC()
 	tg, err := g.NewContractGrpc(ClientOption{
 		StreamNumber: 1,
@@ -106,6 +109,7 @@ func TestContractGrpc_InvokeContract(t *testing.T) {
 }
 
 func TestContractGrpc_InvokeContractReturnReceipt(t *testing.T) {
+	t.Skip()
 	g := NewGRPC()
 	tg, err := g.NewContractGrpc(ClientOption{
 		StreamNumber: 1,
