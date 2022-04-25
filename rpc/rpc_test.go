@@ -1159,7 +1159,89 @@ func TestRPC_GetAccountProof(t *testing.T) {
 		return
 	}
 
-	assert.True(t, Validate(act, res))
+	assert.True(t, ValidateAccountProof(act, res))
+}
+
+func TestRPC_GetTxProof(t *testing.T) {
+	t.Skip()
+	block, _ := rpc.GetLatestBlock()
+	info, err := rpc.GetTxByBlkHashAndIdx(block.Hash, 0)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	res, err2 := rpc.GetTxProof(info.Hash)
+	if err2 != nil {
+		t.Error(err2)
+		return
+	}
+	ast := assert.New(t)
+	ast.True(ValidateTxProof(info.Hash, block.TxRoot, res))
+}
+
+func TestRPC_ArchiveSnapshot(t *testing.T) {
+	t.Skip("need flato 1.5.0")
+	deployJar, err := DecompressFromJar("../hvmtestfile/fibonacci/fibonacci-1.0-fibonacci.jar")
+	if err != nil {
+		t.Error(err)
+	}
+	accountJson, sysErr := account.NewAccountJson(account.SMRAW, "")
+	if sysErr != nil {
+		logger.Error(sysErr)
+		return
+	}
+	key, sysErr := account.GenKeyFromAccountJson(accountJson, "")
+	if sysErr != nil {
+		logger.Error(sysErr)
+		return
+	}
+
+	newAddress := key.(*account.SM2Key).GetAddress()
+	transaction := NewTransaction(newAddress.Hex()).Deploy(common.Bytes2Hex(deployJar)).VMType(HVM)
+	transaction.Sign(key)
+	receipt, err := rpc.DeployContract(transaction)
+	assert.Nil(t, err)
+	t.Log("contract address:", receipt.ContractAddress)
+
+	b, err := rpc.GetLatestBlock()
+	assert.Nil(t, err)
+
+	time.Sleep(20 * time.Second)
+	id, err := rpc.Snapshot(b.Number)
+	assert.Nil(t, err)
+	t.Log(b.Number)
+	t.Log(b.MerkleRoot)
+	t.Log(id)
+}
+
+func TestRPC_GetStateProof(t *testing.T) {
+	// should send to archiveReader!
+	t.Skip("need archiveReader")
+	id := "0x5b1a5bb7b10d15bc9d47701eed9c9349"
+	seq := 2
+	contractAddr := "0x6de31be7a30204189d70bd202340c6d9b395523e"
+	merkleRoot := "0xaa2fd673656f4bada6ff6d8588498239eeb3202214a24005d6cf0138a9f30a79"
+	proofParam := &ProofParam{
+		Meta: &LedgerMetaParam{
+			SnapshotID: id,
+			SeqNo:      uint64(seq),
+		},
+		Key: &KeyParam{
+			Address:   common.HexToAddress(contractAddr),
+			FieldName: "hyperMap1",
+			Params:    []string{"key1"},
+			VMType:    "HVM",
+		},
+	}
+	proof, err := rpc.GetStateProof(proofParam)
+	assert.Nil(t, err)
+	t.Log(proof)
+	b, _ := json.Marshal(proof)
+	t.Log(string(b))
+
+	ok, err := rpc.ValidateStateProof(proofParam, proof, merkleRoot)
+	assert.Nil(t, err)
+	assert.True(t, ok)
 }
 
 /*---------------------------------- cert ----------------------------------*/

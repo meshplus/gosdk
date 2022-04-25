@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/hashicorp/go-uuid"
 	"github.com/meshplus/gosdk/account"
+	"github.com/meshplus/gosdk/common"
 	"github.com/meshplus/gosdk/common/hexutil"
 	"github.com/meshplus/gosdk/common/types"
 	"strconv"
@@ -84,6 +85,7 @@ type Block struct {
 	TxCounts     uint64
 	MerkleRoot   string
 	Transactions []TransactionInfo
+	TxRoot       string
 }
 
 // BlockIntervalRaw describe the BlockInterval related information(not decoded yet)
@@ -151,6 +153,43 @@ type TPSInfo struct {
 	TotalBlockNum uint64
 	BlocksPerSec  float64
 	Tps           float64
+}
+
+// LedgerMetaParam is the ledger info related user-defined param
+type LedgerMetaParam struct {
+	SnapshotID string `json:"snapshotID"`
+	SeqNo      uint64 `json:"seqNo"`
+}
+
+// String return a standard format for LedgerMetaParam value
+func (lp *LedgerMetaParam) String() string {
+	return fmt.Sprintf("snapshotID: %s, seqNo: %d", lp.SnapshotID, lp.SeqNo)
+}
+
+// KeyParam is the ledger-key related user-defined param
+type KeyParam struct {
+	Address   common.Address `json:"address"`
+	FieldName string         `json:"fieldName"`
+	Params    []string       `json:"params"`
+	VMType    string         `json:"vmType"`
+}
+
+// String return a standard format for KeyParam value
+func (kp *KeyParam) String() string {
+	return fmt.Sprintf("address: %s, fieldName: %s, params:%v, vmType: %s",
+		kp.Address.Hex(), kp.FieldName, kp.Params, kp.VMType)
+}
+
+// ProofParam contains ledger info and key info two parts param
+type ProofParam struct {
+	Meta *LedgerMetaParam `json:"meta"`
+	Key  *KeyParam        `json:"key"`
+}
+
+// StateProof is the proof path for a ledger key
+type StateProof struct {
+	StatePath   types.ProofPath `json:"statePath"`
+	AccountPath types.ProofPath `json:"accountPath"`
 }
 
 // TransactionRaw is packaged result of TransactionRaw
@@ -547,6 +586,11 @@ type ArchiveResult struct {
 // AccountProofPath represents the result returned by proof query.
 type AccountProofPath struct {
 	AccountProof types.ProofPath `json:"accountProof"`
+}
+
+// TxProofPath represents the result returned by tx proof query.
+type TxProofPath struct {
+	TxProof types.MerkleProofPath `json:"txProof"`
 }
 
 // ProposalRaw ProposalRaw

@@ -82,6 +82,10 @@ const (
 	AddRootCA  ContractMethod = "AddRootCA"
 	GetRootCAs ContractMethod = "GetRootCAs"
 
+	ChangeHashAlgo     ContractMethod = "ChangeHashAlgo"
+	GetHashAlgo        ContractMethod = "GetHashAlgo"
+	GetSupportHashAlgo ContractMethod = "GetSupportHashAlgo"
+
 	RegisterAnchor   ContractMethod = "RegisterAnchorNode"
 	UnRegisterAnchor ContractMethod = "UnregisterAnchorNode"
 	ReplaceAnchor    ContractMethod = "ReplaceAnchorNode"
@@ -98,6 +102,7 @@ const (
 	mpcAddress          = "0x0000000000000000000000000000000000ffff09"
 	SystemAnchorAddress = "0x0000000000000000000000000000000000ffff0a"
 	rootCAAddress       = "0x0000000000000000000000000000000000ffff0b"
+	hashAlgoAddress     = "0x0000000000000000000000000000000000ffff0d"
 
 	// GenesisInfoKey the key for store genesis info in state db.
 	genesisInfoKey = "the_key_for_genesis_info"
@@ -184,6 +189,14 @@ type CertOperationImpl struct {
 
 func (po *CertOperationImpl) Address() string {
 	return certAddress
+}
+
+type HashAlgoOperationImpl struct {
+	operationImpl
+}
+
+func (mo *HashAlgoOperationImpl) Address() string {
+	return hashAlgoAddress
 }
 
 type MPCOperationImpl struct {
@@ -582,6 +595,10 @@ func newRootCAOperation(method ContractMethod, args ...string) *RootCAOperationI
 	return &RootCAOperationImpl{operationImpl{method: method, args: args}}
 }
 
+func newHashAlgoOperation(method ContractMethod, args ...string) *HashAlgoOperationImpl {
+	return &HashAlgoOperationImpl{operationImpl{method: method, args: args}}
+}
+
 func NewMPCInfoOperation(tag, ct string) BuiltinOperation {
 	return newMPCOperation(SRSInfo, tag, ct)
 }
@@ -678,6 +695,18 @@ func NewSystemAnchorOperation(method ContractMethod, args ...string) BuiltinOper
 	return &SystemAnchorOperationImpl{
 		operationImpl{method: method, args: args},
 	}
+}
+
+func NewHashGetSupportOperation() BuiltinOperation {
+	return newHashAlgoOperation(GetSupportHashAlgo)
+}
+
+func NewHashGetAlgoOperation() BuiltinOperation {
+	return newHashAlgoOperation(GetHashAlgo)
+}
+
+func NewHashChangeHashAlgo(data []byte) BuiltinOperation {
+	return newHashAlgoOperation(ChangeHashAlgo, string(data))
 }
 
 // operationImpl the implementation of Operation
