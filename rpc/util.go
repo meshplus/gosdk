@@ -7,11 +7,11 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"github.com/meshplus/gosdk/account"
-	"github.com/meshplus/gosdk/common"
 	gm "github.com/meshplus/crypto-gm"
 	"github.com/meshplus/crypto-standard/asym"
 	"github.com/meshplus/crypto-standard/hash"
+	"github.com/meshplus/gosdk/account"
+	"github.com/meshplus/gosdk/common"
 	"io/ioutil"
 	"strings"
 )
@@ -154,7 +154,7 @@ func DecompressFromJar(filepath string) ([]byte, error) {
 }
 
 func DecompressFromJarWithTxVersion(filepath, txversion string) ([]byte, error) {
-	if GetTxVersionInt(txversion) < TxVersion30 {
+	if CompareTxVersion(txversion, TxVersion30) < 0 {
 		return ioutil.ReadFile(filepath)
 	}
 	reader, err := zip.OpenReader(filepath)

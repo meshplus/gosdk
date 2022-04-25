@@ -5,7 +5,7 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"encoding/json"
-	"errors"
+	"github.com/meshplus/gosdk/common"
 	"github.com/meshplus/gosdk/common/hexutil"
 	"github.com/meshplus/gosdk/kvsql"
 	"strconv"
@@ -17,7 +17,6 @@ import (
 	"github.com/meshplus/gosdk/account"
 
 	"github.com/meshplus/gosdk/abi"
-	"github.com/meshplus/gosdk/common"
 )
 
 // VMType vm type, could by evm and jvm
@@ -31,12 +30,9 @@ const (
 	BVM      VMType = "BVM"
 	TRANSFER VMType = "TRANSFER"
 	KVSQL    VMType = "KVSQL"
+	FVM      VMType = "FVM"
 	UNIT            = 32
 	//JSVM VMType = "jsvm"
-
-	//extraId parameter
-	ExtraIDStringMaxLength int = 1024
-	ExtraIDListMaxLength   int = 30
 
 	//default transaction gas limit
 	DefaultTxGasLimit = 1000000000
@@ -60,31 +56,9 @@ const (
 	DID_GETEXTRA           = 210
 )
 
-type TxVersionInt int
-
 const (
-	TxVersion10 TxVersionInt = 1
-	TxVersion20 TxVersionInt = 2
-	TxVersion21 TxVersionInt = 3
-	TxVersion22 TxVersionInt = 4
-	TxVersion23 TxVersionInt = 5
-	TxVersion24 TxVersionInt = 6
-	TxVersion25 TxVersionInt = 7
-	TxVersion26 TxVersionInt = 8
-	TxVersion27 TxVersionInt = 9
-	TxVersion28 TxVersionInt = 10
-	TxVersion29 TxVersionInt = 11
-	TxVersion30 TxVersionInt = 12
-	TxVersion31 TxVersionInt = 13
-	TxVersion32 TxVersionInt = 14
-	TxVersion33 TxVersionInt = 15
-	TxVersion34 TxVersionInt = 16
-	TxVersion35 TxVersionInt = 17
-	TxVersion36 TxVersionInt = 18
-	TxVersion37 TxVersionInt = 19
-	TxVersion38 TxVersionInt = 20
-	TxVersion39 TxVersionInt = 21
-	TxVersion40 TxVersionInt = 22
+	TxVersion25 string = "2.5"
+	TxVersion30 string = "3.0"
 )
 
 // Params interface
@@ -126,35 +100,93 @@ type Transaction struct {
 	optionExtra  string
 }
 
-func GetTxVersionInt(txVersionStr string) TxVersionInt {
-	switch txVersionStr {
-	case "1.0":
-		return TxVersion10
-	case "2.0":
-		return TxVersion20
-	case "2.1":
-		return TxVersion21
-	case "2.2":
-		return TxVersion22
-	case "2.3":
-		return TxVersion23
-	case "2.4":
-		return TxVersion24
-	case "2.5":
-		return TxVersion25
-	case "2.6":
-		return TxVersion26
-	case "2.7":
-		return TxVersion27
-	case "2.8":
-		return TxVersion28
-	case "2.9":
-		return TxVersion29
-	case "3.0":
-		return TxVersion30
-	default:
-		return TxVersion10
+func (t *Transaction) GetFrom() string {
+	return t.from
+}
+
+func (t *Transaction) GetTo() string {
+	return t.to
+}
+
+func (t *Transaction) GetOpcode() int64 {
+	return t.opcode
+}
+
+func (t *Transaction) GetVmType() string {
+	return t.vmType
+}
+
+func (t *Transaction) GetExtraIdInt64() []int64 {
+	return t.extraIdInt64
+}
+
+func (t *Transaction) GetExtraIdStringArray() []string {
+	return t.extraIdString
+}
+
+func (t *Transaction) GetCName() string {
+	return t.cName
+}
+
+func (t *Transaction) GetValue() int64 {
+	return t.value
+}
+
+func (t *Transaction) GetPayload() string {
+	return t.payload
+}
+
+func (t *Transaction) GetSignature() string {
+	return t.signature
+}
+
+func (t *Transaction) GetTimestamp() int64 {
+	return t.timestamp
+}
+
+func (t *Transaction) IsSimulate() bool {
+	return t.simulate
+}
+
+func (t *Transaction) GetNonce() int64 {
+	return t.nonce
+}
+
+func (t *Transaction) GetExtra() string {
+	return t.extra
+}
+
+// CompareTxVersion the value of TXVersion , return 1 if a > b ,0 if a = b, -1 if a < bq
+func CompareTxVersion(a, b string) int {
+	indexa, indexb := 0, 0
+	lengtha, lengthb := len(a), len(b)
+	for indexa < lengtha || indexb < lengthb {
+		parta, partb := 0, 0
+		for ; indexa < lengtha; indexa++ {
+			if a[indexa] != '.' {
+				parta = parta << 4
+				parta += int(a[indexa] - '0')
+			} else {
+				indexa++
+				break
+			}
+		}
+		for ; indexb < lengthb; indexb++ {
+			if b[indexb] != '.' {
+				partb = partb << 4
+				partb += int(b[indexb] - '0')
+			} else {
+				indexb++
+				break
+			}
+		}
+		if parta > partb {
+			return 1
+		} else if parta < partb {
+			return -1
+		}
 	}
+	return 0
 }
 
 // NewTransaction return a empty transaction
@@ -228,6 +260,7 @@ func (t *Transaction) Transfer(to string, value int64) *Transaction {
 	t.value = value
 	t.to = chPrefix(to)
 	t.isValue = true
+	t.vmType = string(TRANSFER)
 	return t
 }
 
@@ -308,7 +341,7 @@ func (t *Transaction) InvokeSql(to string, payload []byte) *Transaction {
 	return t.Invoke(to, append([]byte{kvsql.RawSql}, payload...))
 }
 
-// InvokeByName invoke by name
+// Invoke add transaction isInvoke
 func (t *Transaction) InvokeByName(name string, payload []byte) *Transaction {
 	if string(payload[0:8]) == "fefffbce" {
 		t.payload = chPrefix("fefffbce" + common.Bytes2Hex(payload[8:]))
@@ -320,9 +353,9 @@ func (t *Transaction) InvokeByName(name string, payload []byte) *Transaction {
 	return t
 }
 
+// Deprecated
 // InvokeContract invoke evm contract by raw ABI, function name and arguments in string format
 // use abi.Encode instead
-// Deprecated
 func (t *Transaction) InvokeContract(to string, rawAbi string, funcName string, args ...string) *Transaction {
 
 	ABI, err := abi.JSON(strings.NewReader(rawAbi))
@@ -346,7 +379,7 @@ func (t *Transaction) InvokeContract(to string, rawAbi string, funcName string, 
 	return t
 }
 
-// Extra set transaction extra
+// Extra add extra into transaction
 func (t *Transaction) Extra(extra string) *Transaction {
 	t.extra = extra
 	t.hasExtra = true
@@ -503,13 +536,7 @@ func (t *Transaction) GetExtraIdString() (string, error) {
 		extraids = append(extraids, in)
 	}
 	for _, str := range t.extraIdString {
-		if len(str) > ExtraIDStringMaxLength {
-			return "", errors.New("extraId string exceed the ExtraIDStringMaxLength")
-		}
 		extraids = append(extraids, str)
-	}
-	if len(extraids) > ExtraIDListMaxLength {
-		return "", errors.New("extraId list exceed ExtraIDListMaxLength")
 	}
 	data, err := json.Marshal(extraids)
 	if err != nil {
@@ -544,7 +571,7 @@ func (t *Transaction) getTxVersion() string {
 	return t.txVersion
 }
 
-// SetExtraIDString set transaction string extraId
+// SetOptionExtra set transaction string extraId
 func (t *Transaction) SetOptionExtra(option string) {
 
 	t.optionExtra = option
@@ -681,7 +708,7 @@ func (t *Transaction) Sign(key interface{}) {
 	t.sign(key, false)
 }
 
-// SignWIthBatch support ecdsa\SM2\Ed25519 signature
+// SignWithBatchFlag SignWIthBatch support ecdsa\SM2\Ed25519 signature
 // Only affect sm2 signature, other types (ED25519/ECDSA) are the same as Sign
 // Only flato 1.0.2 +
 func (t *Transaction) SignWithBatchFlag(key interface{}) {
@@ -856,10 +883,13 @@ func (t *Transaction) SetIsInvoke(isInvoke bool) {
 
 func (t *Transaction) SetExtra(extra string) {
 	t.extra = extra
+	t.hasExtra = true
 }
 
 func (t *Transaction) SetKvExtra(kvExtra *KVExtra) {
 	t.kvExtra = kvExtra
+	t.extra = kvExtra.Stringify()
+	t.hasExtra = true
 }
 
 func (t *Transaction) SetHasExtra(hasExtra bool) {
@@ -939,7 +969,7 @@ func (t *Transaction) GetTransactionHash(gasLimit int64) string {
 		return ""
 	}
 
-	if GetTxVersionInt(t.txVersion) >= TxVersion25 {
+	if CompareTxVersion(t.txVersion, TxVersion25) >= 0 {
 		binary.BigEndian.PutUint64(h[0:TimeLength], uint64(t.timestamp))
 	}
 	return "0x" + common.Bytes2Hex(h)

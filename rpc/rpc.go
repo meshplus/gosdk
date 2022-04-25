@@ -23,6 +23,8 @@ const (
 	TRANSACTION = "tx_"
 	// CONTRACT type
 	CONTRACT = "contract_"
+	// CONTRACT type
+	CROSS_CHAIN = "crosschain_"
 	// BLOCK type
 	BLOCK = "block_"
 	// ACCOUNT type
@@ -61,6 +63,19 @@ const (
 	DefaultReConnectTime      = 10000
 	DefaultTxVersion          = "3.0"
 )
+
+type CrossChainMethod string
+
+const (
+	// InvokeAnchorContract method used for normal cross chain request
+	InvokeAnchorContract CrossChainMethod = "invokeAnchorContract"
+	// InvokeTimeoutContract method used for timeout cross chain request
+	InvokeTimeoutContract CrossChainMethod = "invokeTimeoutContract"
+)
+
+func (c CrossChainMethod) String() string {
+	return string(c)
+}
 
 var (
 	logger    = common.GetLogger("rpc")
@@ -561,6 +576,11 @@ func (rpc *RPC) GetNodes() ([]NodeInfo, StdError) {
 	}
 
 	return nodeInfo, nil
+}
+
+// GetNodesNum 获取rpc连接的节点数
+func (rpc *RPC) GetNodesNum() int {
+	return len(rpc.hrm.nodes)
 }
 
 // GetNodeHash 获取随机节点hash
@@ -1836,6 +1856,62 @@ func (rpc *RPC) SignAndDeployContract(transaction *Transaction, key interface{})
 		return rpc.Call(method, param)
 	}
 	return rpc.CallByPolling(method, param, transaction.isPrivateTx)
+}
+
+// SignAndDeployCrossChainContract deploy cross_chain contract rpc
+func (rpc *RPC) SignAndDeployCrossChainContract(transaction *Transaction, key interface{}) (*TxReceipt, StdError) {
+	transaction.txVersion = rpc.txVersion
+	transaction.Sign(key)
+	var method string
+	if transaction.isPrivateTx {
+		method = CROSS_CHAIN + "deployPrivateContract"
+	} else {
+		if !isTxVersion10(transaction.getTxVersion()) && transaction.simulate {
+			method = SIMULATE + "deployContract"
+		} else {
+			method = CROSS_CHAIN + "deployContract"
+		}
+	}
+	transaction.isDeploy = true
+	param := transaction.Serialize()
+	if transaction.simulate {
+		return rpc.Call(method, param)
+	}
+	return rpc.CallByPolling(method, param, transaction.isPrivateTx)
+}
+
+func (rpc *RPC) SignAndInvokeCrossChainContract(transaction *Transaction, methodName CrossChainMethod, key interface{}) (*TxReceipt, StdError) {
+	transaction.txVersion = rpc.txVersion
+	transaction.Sign(key)
+	if transaction.isPrivateTx || transaction.simulate {
+		return nil, NewSystemError(errors.New("not support private or simulate tx"))
+	}
+	method := CROSS_CHAIN + methodName.String()
+	transaction.isInvoke = true
+	param := transaction.Serialize()
+
+	if transaction.simulate {
+		return rpc.Call(method, param)
+	}
+	return rpc.CallByPolling(method, param, transaction.isPrivateTx)
+}
+
+// InvokeCrossChainContractReturnHash for pressure test
+// Deprecated:
+func (rpc *RPC) InvokeCrossChainContractReturnHash(transaction *Transaction, methodName CrossChainMethod) (string, StdError) {
+	method := CROSS_CHAIN + methodName
+	param := transaction.Serialize()
+	data, err := rpc.call(method.String(), param)
+	if err != nil {
+		return "", err
+	}
+
+	var hash string
+	if sysErr := json.Unmarshal(data, &hash); sysErr != nil {
+		return "", NewSystemError(sysErr)
+	}
+
+	return hash, nil
 }
 
 // SignAndInvokeContract invoke contract rpc

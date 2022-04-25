@@ -19,6 +19,7 @@ message ProposalData{
         NODE = 2;
         CNS = 3;
         CONTRACT = 4;
+        CA = 5;
     }
     uint64  id = 1;
     bytes  code = 2;

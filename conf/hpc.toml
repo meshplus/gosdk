@@ -17,6 +17,9 @@ reConnectTime = 10000
     # webSocket connect port
     ports = ["10001", "10002", "10003", "10004"]
 
+[grpc]
+    ports = ["11001", "11002", "11003", "11004"]
+
 [polling]
     #重发次数
     resendTime = 10
@@ -50,6 +53,7 @@ reConnectTime = 10000
     tlsca = "certs/tls/tlsca.ca"
     tlspeerCert = "certs/tls/tls_peer.cert"
     tlspeerPriv = "certs/tls/tls_peer.priv"
+    tlsDomain = "hyperchain.cn"
 
 [log]
     #设置日志输出门槛
@@ -66,8 +70,20 @@ reConnectTime = 10000
 	# (keep-alive) connections to keep per-host. If zero,
 	# DefaultMaxIdleConnsPerHost is used.
 	maxIdleConnsPerHost = 10
+    # MaxRecvMsgSize, set max recv msg size for grpc /b
+	maxRecvMsgSize = 51200
+	# MaxSendMsgSize, set max sendMsg size for grpc /b
+	maxSendMsgSize = 51200
+	#DailTimeout dail time out
+	dailTimeout = 5
+	# MaxLifetime(unused), set the connections max life time, if zero, no limit, /s
+	maxLifetime = 0
+	# MaxStreamLifeTime, set the stream max life time, if zero, no limit, /s
+	# Attention: this should change follow the streamIdle in flato, and should be
+	# smaller than what in flato
+	maxStreamLifeTime = 5
 [inspector]
-    enable = true
+    enable = false
     defaultAccount = "keystore/0xfc546753921c1d1bc2d444c5186a73ab5802a0b4"
     accountType = "ecdsa"
 

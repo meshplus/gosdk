@@ -1158,7 +1158,7 @@ func TestRPC_GetAccountProof(t *testing.T) {
 		t.Error(err)
 		return
 	}
-	
+
 	assert.True(t, Validate(act, res))
 }
 

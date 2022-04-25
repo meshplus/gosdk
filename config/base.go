@@ -104,6 +104,9 @@ func Default() *Config {
 		webSocket: webSocket{
 			ports: []string{"10001", "10002", "10003", "10004"},
 		},
+		grpc: grpc{
+			ports: []string{"11001", "11002", "11003", "11004"},
+		},
 		polling: polling{
 			resendTime:            10,
 			firstPollingInterval:  100,
@@ -133,9 +136,14 @@ func Default() *Config {
 		transport: transport{
 			maxIdleConns:        0,
 			maxIdleConnsPerHost: 10,
+			maxRecvMsgSize:      51200,
+			maxSendMsgSize:      51200,
+			dailTimeout:         5,
+			maxLifetime:         0,
+			maxStreamLifeTime:   5,
 		},
 		inspector: inspector{
-			enable:         true,
+			enable:         false,
 			defaultAccount: "keystore/0xfc546753921c1d1bc2d444c5186a73ab5802a0b4",
 			accountType:    "ecdsa",
 		},
@@ -164,6 +172,7 @@ func (c *Config) load() {
 	c.loadBase()
 	c.loadJsonRPC()
 	c.loadWebSocket()
+	c.loadGrpc()
 	c.loadPolling()
 	c.loadPrivacy()
 	c.loadSecurity()
@@ -222,6 +231,12 @@ func (c *Config) loadWebSocket() {
 
 func (c *Config) GetWebSocketPorts() []string {
 	return c.webSocket.ports
+}
+
+func (c *Config) loadGrpc() {
+	if c.vi.Get(common.GrpcPorts) != nil {
+		c.grpc.ports = c.vi.GetStringSlice(common.GrpcPorts)
+	}
 }
 
 func (c *Config) GetGRPCPorts() []string {
@@ -392,6 +407,21 @@ func (c *Config) loadTransport() {
 	}
 	if c.vi.Get(common.MaxIdleConnsPerHost) != nil {
 		c.transport.maxIdleConnsPerHost = c.vi.GetInt(common.MaxIdleConnsPerHost)
+	}
+	if c.vi.Get(common.MaxRecvMsgSize) != nil {
+		c.transport.maxRecvMsgSize = c.vi.GetInt(common.MaxRecvMsgSize)
+	}
+	if c.vi.Get(common.MaxSendMsgSize) != nil {
+		c.transport.maxSendMsgSize = c.vi.GetInt(common.MaxSendMsgSize)
+	}
+	if c.vi.Get(common.DailTimeout) != nil {
+		c.transport.dailTimeout = c.vi.GetInt64(common.DailTimeout)
+	}
+	if c.vi.Get(common.MaxLifetime) != nil {
+		c.transport.maxLifetime = c.vi.GetInt64(common.MaxLifetime)
+	}
+	if c.vi.Get(common.MaxStreamLifetime) != nil {
+		c.transport.maxStreamLifeTime = c.vi.GetInt64(common.MaxStreamLifetime)
 	}
 }
 
