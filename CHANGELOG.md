@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+<a name="1.2.1"></a>
+## [1.2.1](http://git.hyperchain.cn/hyperchain/gosdk/compare/v1.2.0...v1.2.1) (2022-05-18)
+
+
+### Bug Fixes
+
+* **transfer:** transfer vmType ([8816355](http://git.hyperchain.cn/hyperchain/gosdk/commits/8816355))
+
+
+
 <a name="0.1.3"></a>
 ## [0.1.3](http://git.hyperchain.cn/hyperchain/gosdk/compare/v0.1.2...v0.1.3) (2021-08-03)
 
