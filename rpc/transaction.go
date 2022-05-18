@@ -260,7 +260,13 @@ func (t *Transaction) Transfer(to string, value int64) *Transaction {
 	t.value = value
 	t.to = chPrefix(to)
 	t.isValue = true
-	t.vmType = string(TRANSFER)
+	// if node version lower than 2.1, should point vmType to EVM.
+	// However, in order to use sdk with lower version node, we do this here
+	if t.txVersion < "2.1" {
+		t.vmType = string(EVM)
+	} else {
+		t.vmType = string(TRANSFER)
+	}
 	return t
 }
 
