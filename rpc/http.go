@@ -330,6 +330,9 @@ func (hrm *httpRequestManager) getTCert(url string) (string, StdError) {
 		ID:        1,
 		Namespace: hrm.namespace,
 	}
+	if hrm.tcm == nil {
+		return "", nil
+	}
 	uniqPub, sysErr := ioutil.ReadFile(hrm.tcm.uniquePubPath)
 	if sysErr != nil {
 		return "", NewSystemError(sysErr)

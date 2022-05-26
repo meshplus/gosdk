@@ -1,10 +1,10 @@
 package rpc
 
 import (
+	"github.com/magiconair/properties/assert"
 	"github.com/meshplus/gosdk/account"
 	"github.com/meshplus/gosdk/common/hexutil"
 	"github.com/meshplus/gosdk/kvsql"
-	"github.com/magiconair/properties/assert"
 	"testing"
 )
 

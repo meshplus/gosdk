@@ -6,7 +6,7 @@ require (
 	github.com/coreos/etcd v3.3.12+incompatible
 	github.com/davecgh/go-spew v1.1.1
 	github.com/dsnet/compress v0.0.0-20171208185109-cc9eb1d7ad76 // indirect
-	github.com/gogo/protobuf v1.3.1
+	github.com/gogo/protobuf v1.3.2
 	github.com/golang/protobuf v1.4.2
 	github.com/gorilla/websocket v1.4.0
 	github.com/hashicorp/go-uuid v1.0.2

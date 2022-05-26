@@ -435,7 +435,6 @@ func TestSm2AccountCreateAndParse(t *testing.T) {
 	assert.Equal(t, jsAcc["address"], gmAcc.GetAddress().Hex())
 	assert.Equal(t, jsAcc["address"], x1.(*SM2Key).GetAddress().Hex())
 
-
 	_, err = GenKeyFromAccountJson("", "")
 	assert.Equal(t, "parse account json error: can not parse account json with 4.0 version without algo attribute", err.Error())
 

@@ -17,6 +17,7 @@ func TestGetECert(t *testing.T) {
 	if err != nil {
 		logger.Error(fmt.Sprintf("read conf from %s error", filepath.Join(confRootPath, common.DefaultConfRelPath)))
 	}
+	vip.Set("privacy.sendTcert", true)
 	tcm := NewTCertManager(vip, confRootPath)
 	assert.Equal(t, true, len(tcm.GetECert()) > 0)
 }

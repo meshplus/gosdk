@@ -28,7 +28,6 @@ type ProofNode struct {
 // ProofPath struct
 type ProofPath []*ProofNode
 
-
 // Validate validates poof with given key
 func Validate(key []byte, proof ProofPath) bool {
 	if len(proof) == 0 || !proof[len(proof)-1].IsData {
