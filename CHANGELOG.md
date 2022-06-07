@@ -2,6 +2,22 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+<a name="1.2.2"></a>
+## [1.2.2](http://git.hyperchain.cn/hyperchain/gosdk/compare/v1.2.1...v1.2.2) (2022-06-07)
+
+
+### Bug Fixes
+
+* **default:** default sendTcert ([ae9b4b8](http://git.hyperchain.cn/hyperchain/gosdk/commits/ae9b4b8))
+* **mod:** mod ([47bf2e6](http://git.hyperchain.cn/hyperchain/gosdk/commits/47bf2e6))
+
+
+### Features
+
+* **proof:** proof and hash ([807d110](http://git.hyperchain.cn/hyperchain/gosdk/commits/807d110))
+
+
+
 <a name="1.2.1"></a>
 ## [1.2.1](http://git.hyperchain.cn/hyperchain/gosdk/compare/v1.2.0...v1.2.1) (2022-05-18)
 
