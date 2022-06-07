@@ -115,7 +115,7 @@ func Default() *Config {
 			secondPollingTimes:    10,
 		},
 		privacy: privacy{
-			sendTcert:       true,
+			sendTcert:       false,
 			sdkcertPath:     "certs/sdkcert.cert",
 			sdkcertPrivPath: "certs/sdkcert.priv",
 			uniquePubPath:   "certs/unique.pub",

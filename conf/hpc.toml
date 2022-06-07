@@ -34,7 +34,7 @@ reConnectTime = 10000
 
 [privacy]
     #send Tcert during the request or not
-    sendTcert = true
+    sendTcert = false
     #if sendTcert is true , you should add follow path.
     #the paths followed are relative to conf root path
     sdkcertPath = "certs/sdkcert.cert"

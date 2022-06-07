@@ -10,8 +10,6 @@ import (
 	"time"
 )
 
-
-
 func TestDID_SetChainID(t *testing.T) {
 	t.Skip("skip this test")
 	rpc := NewRPC()

@@ -3,11 +3,11 @@ package java
 import (
 	"fmt"
 	"github.com/coreos/etcd/pkg/testutil"
+	gm "github.com/meshplus/crypto-gm"
+	"github.com/meshplus/crypto-standard/hash"
 	"github.com/meshplus/gosdk/common"
 	"github.com/meshplus/gosdk/rpc"
 	"github.com/stretchr/testify/assert"
-	gm "github.com/meshplus/crypto-gm"
-	"github.com/meshplus/crypto-standard/hash"
 	"testing"
 )
 
