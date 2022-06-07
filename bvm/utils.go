@@ -56,6 +56,11 @@ type ContractManagerOptions struct {
 	CompileOpt map[string]string `json:"compileOpt,omitempty"`
 }
 
+type AlgoSet struct {
+	HashAlgo    string `json:"hash_algo"`
+	EncryptAlgo string `json:"encrypt_algo"`
+}
+
 func boolToString(b bool) string {
 	return strconv.FormatBool(b)
 }

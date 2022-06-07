@@ -471,5 +471,5 @@ func (hrm *httpRequestManager) ReConnectNode(nodeIndex int) {
 }
 
 func isFlato(TxVersion string) bool {
-	return TxVersion != DefaultTxVersion
+	return TxVersion != "1.0"
 }

@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"github.com/meshplus/gosdk/account"
-	"github.com/meshplus/gosdk/common"
 	"github.com/meshplus/gosdk/common/types"
 	"github.com/meshplus/gosdk/config"
 	"io/ioutil"
@@ -15,6 +14,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/meshplus/gosdk/common"
 	"github.com/terasum/viper"
 )
 
@@ -1226,6 +1226,21 @@ func (rpc *RPC) GetTransactionByHash(txHash string) (*TransactionInfo, StdError)
 	return tx.ToTransaction()
 }
 
+func (rpc *RPC) GetTransactionByHashByPolling(txHash string) (*TransactionInfo, StdError) {
+	method := TRANSACTION + "getTransactionByHash"
+	param := txHash
+	data, err := rpc.callByPolling(method, param)
+	if err != nil {
+		return nil, err
+	}
+
+	var tx TransactionRaw
+	if sysErr := json.Unmarshal(data, &tx); sysErr != nil {
+		return nil, NewSystemError(sysErr)
+	}
+	return tx.ToTransaction()
+}
+
 // GetPrivateTransactionByHash 查询隐私交易
 // Deprecated
 func (rpc *RPC) GetPrivateTransactionByHash(txHash string) (*TransactionInfo, StdError) {
@@ -1880,6 +1895,29 @@ func (rpc *RPC) SignAndDeployCrossChainContract(transaction *Transaction, key in
 	return rpc.CallByPolling(method, param, transaction.isPrivateTx)
 }
 
+// SignAndInvokeContract invoke contract rpc
+func (rpc *RPC) SignAndInvokeContract(transaction *Transaction, key interface{}) (*TxReceipt, StdError) {
+	transaction.txVersion = rpc.txVersion
+	transaction.Sign(key)
+	var method string
+	if transaction.isPrivateTx {
+		method = CONTRACT + "invokePrivateContract"
+	} else {
+		if !isTxVersion10(transaction.getTxVersion()) && transaction.simulate {
+			method = SIMULATE + "invokeContract"
+		} else {
+			method = CONTRACT + "invokeContract"
+		}
+	}
+	transaction.isInvoke = true
+	param := transaction.Serialize()
+
+	if transaction.simulate {
+		return rpc.Call(method, param)
+	}
+	return rpc.CallByPolling(method, param, transaction.isPrivateTx)
+}
+
 func (rpc *RPC) SignAndInvokeCrossChainContract(transaction *Transaction, methodName CrossChainMethod, key interface{}) (*TxReceipt, StdError) {
 	transaction.txVersion = rpc.txVersion
 	transaction.Sign(key)
@@ -1914,36 +1952,13 @@ func (rpc *RPC) InvokeCrossChainContractReturnHash(transaction *Transaction, met
 	return hash, nil
 }
 
-// SignAndInvokeContract invoke contract rpc
-func (rpc *RPC) SignAndInvokeContract(transaction *Transaction, key interface{}) (*TxReceipt, StdError) {
-	transaction.txVersion = rpc.txVersion
-	transaction.Sign(key)
-	var method string
-	if transaction.isPrivateTx {
-		method = CONTRACT + "invokePrivateContract"
-	} else {
-		if !isTxVersion10(transaction.getTxVersion()) && transaction.simulate {
-			method = SIMULATE + "invokeContract"
-		} else {
-			method = CONTRACT + "invokeContract"
-		}
-	}
-	transaction.isInvoke = true
-	param := transaction.Serialize()
-
-	if transaction.simulate {
-		return rpc.Call(method, param)
-	}
-	return rpc.CallByPolling(method, param, transaction.isPrivateTx)
-}
-
 // SignAndInvokeContractCombineReturns invoke contract rpc, return *TxReceipt and *TransactionInfo
 func (rpc *RPC) SignAndInvokeContractCombineReturns(transaction *Transaction, key interface{}) (*TxReceipt, *TransactionInfo, StdError) {
 	txReceipt, err := rpc.SignAndInvokeContract(transaction, key)
 	if err != nil {
 		return nil, nil, err
 	}
-	txInfo, err := rpc.GetTransactionByHash(txReceipt.TxHash)
+	txInfo, err := rpc.GetTransactionByHashByPolling(txReceipt.TxHash)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -2350,6 +2365,25 @@ func (rpc *RPC) Snapshot(blockHeight interface{}) (string, StdError) {
 	return result, nil
 }
 
+// MakeSnapshot4Flato used in flato version: make a snapshot for an existed block number
+// param requirement: blockNumber <= flato latest checkpoint
+func (rpc *RPC) MakeSnapshot4Flato(blockHeight interface{}) (string, StdError) {
+	method := ARCHIVE + "makeSnapshot4Flato"
+
+	data, stdErr := rpc.call(method, blockHeight)
+	if stdErr != nil {
+		return "", stdErr
+	}
+
+	var result string
+
+	if sysErr := json.Unmarshal(data, &result); sysErr != nil {
+		return "", NewSystemError(sysErr)
+	}
+
+	return result, nil
+}
+
 // QuerySnapshotExist checks if the given snapshot existed, so you can confirm that
 // the last step Archive.Snapshot is successful.
 // Deprecated
@@ -2555,6 +2589,11 @@ func (rpc *RPC) QueryArchiveExist(filterID string) (bool, StdError) {
 }
 
 // QueryArchive query archive status with the give snapshot.
+// the results will be
+// 1. this snapshot is old version, cannot get status
+// 2. this snapshot has not finished archive
+// 3. this snapshot has been archived
+// 4. "" (this will be with err message)
 func (rpc *RPC) QueryArchive(filterID string) (string, StdError) {
 	method := ARCHIVE + "queryArchive"
 
@@ -2610,6 +2649,29 @@ func (rpc *RPC) Pending() ([]SnapshotEvent, StdError) {
 
 /*---------------------------------- proof ----------------------------------*/
 
+// GetTxProof query proofPath of given txhash.
+func (rpc *RPC) GetTxProof(txhash string) (*TxProofPath, StdError) {
+	method := PROOF + "getTxProof"
+	param := txhash
+	data, err := rpc.call(method, param)
+	if err != nil {
+		return nil, err
+	}
+
+	var res TxProofPath
+	if sysErr := json.Unmarshal(data, &res); sysErr != nil {
+		return nil, NewSystemError(sysErr)
+	}
+
+	return &res, nil
+}
+
+func ValidateTxProof(txhash string, txroot string, path *TxProofPath) (bool, StdError) {
+	txHash := common.Hex2Bytes(txhash)
+	txRooot := common.Hex2Bytes(txroot)
+	return types.ValidateMerkleProof(path.TxProof, txHash, txRooot), nil
+}
+
 // GetAccountProof query proofPath of given account.
 func (rpc *RPC) GetAccountProof(account string) (*AccountProofPath, StdError) {
 	account = chPrefix(account)
@@ -2628,10 +2690,42 @@ func (rpc *RPC) GetAccountProof(account string) (*AccountProofPath, StdError) {
 	return &res, nil
 }
 
-func Validate(account string, path *AccountProofPath) bool {
+func ValidateAccountProof(account string, path *AccountProofPath) bool {
 	b := common.Hex2Bytes(account)
 	addr := common.BytesToAddress(b)
 	return types.Validate(addr.Bytes(), path.AccountProof)
+}
+
+// GetStateProof get state proof from archive reader
+func (rpc *RPC) GetStateProof(proofParam *ProofParam) (*StateProof, StdError) {
+	method := PROOF + "getStateProof"
+	data, err := rpc.call(method, proofParam)
+	if err != nil {
+		return nil, err
+	}
+
+	var res StateProof
+	if sysErr := json.Unmarshal(data, &res); sysErr != nil {
+		return nil, NewSystemError(sysErr)
+	}
+
+	return &res, nil
+}
+
+// ValidateStateProof validate the proof is right in the snapshot
+func (rpc *RPC) ValidateStateProof(proofParam *ProofParam, stateProof *StateProof, merkleRoot string) (bool, StdError) {
+	method := PROOF + "validateStateProof"
+	data, err := rpc.call(method, proofParam, stateProof, merkleRoot)
+	if err != nil {
+		return false, err
+	}
+
+	var res bool
+	if sysErr := json.Unmarshal(data, &res); sysErr != nil {
+		return false, NewSystemError(sysErr)
+	}
+
+	return res, nil
 }
 
 /*---------------------------------- cert ----------------------------------*/
@@ -2853,6 +2947,21 @@ func (rpc *RPC) GetAllCNS() (map[string]string, StdError) {
 		return nil, NewSystemError(sysErr)
 	}
 	return all, nil
+}
+
+// GetGenesisInfo get genesis info.
+func (rpc *RPC) GetGenesisInfo() (string, StdError) {
+	method := CONFIG + "getGenesisInfo"
+	data, err := rpc.call(method)
+	if err != nil {
+		return "", err
+	}
+
+	var config string
+	if sysErr := json.Unmarshal(data, &config); sysErr != nil {
+		return "", NewSystemError(sysErr)
+	}
+	return config, nil
 }
 
 // SetAccount set account key for sign request
