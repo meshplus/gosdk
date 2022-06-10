@@ -8,7 +8,7 @@ import (
 
 	"github.com/golang/protobuf/proto"
 	"github.com/meshplus/gosdk/common"
-	"github.com/mholt/archiver"
+	"github.com/mholt/archiver/v3"
 	"github.com/opentracing/opentracing-go/log"
 )
 
@@ -18,7 +18,7 @@ var logger = common.GetLogger("java")
 // path and return the payload used to deploy
 // params indicates the constructor params
 func ReadJavaContract(path string, params ...string) (string, error) {
-	err := archiver.TarGz.Make("tmp.tar.gz", []string{path})
+	err := archiver.Archive([]string{path}, "tmp.tar.gz")
 	if err != nil {
 		logger.Error(err)
 		return "", nil
