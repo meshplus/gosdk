@@ -13,6 +13,7 @@ require (
 	github.com/magiconair/properties v1.8.0
 	github.com/meshplus/crypto v0.0.8
 	github.com/meshplus/crypto-gm v0.1.1
+	github.com/google/gofuzz v1.2.0
 	github.com/meshplus/crypto-standard v0.1.2
 	github.com/meshplus/flato-msp-cert v0.1.1
 	github.com/mholt/archiver/v3 v3.5.1

@@ -1469,8 +1469,7 @@ func deployContract(bin, abi string, params ...interface{}) (string, StdError) {
 		transaction = NewTransaction(common.BytesToAddress(newAddress).Hex()).Deploy(bin).DeployArgs(abi, params)
 		//transaction, err = NewDeployTransactionWithArgs(guomiKey.GetAddress(), bin, false, EVM, abi, params)
 	}
-	transaction.Sign(guomiKey)
-	txReceipt, err := rpc.DeployContract(transaction)
+	txReceipt, err := rpc.SignAndDeployContract(transaction, guomiKey)
 	if err != nil {
 		logger.Error(err)
 	}
