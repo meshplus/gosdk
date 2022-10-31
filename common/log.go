@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/op/go-logging"
-	"github.com/terasum/viper"
+	"github.com/spf13/viper"
 )
 
 const defaultLoggerFormat = "%{color}[%{module}][%{level:.5s}] %{time:2006-01-02 15:04:05} %{shortfile} %{message} %{color:reset}"

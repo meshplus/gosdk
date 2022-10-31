@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"github.com/golang/protobuf/proto"
 	"github.com/meshplus/gosdk/common"
-	"github.com/meshplus/gosdk/common/types"
 	"github.com/meshplus/gosdk/grpc/api"
 	"github.com/meshplus/gosdk/grpc/pool"
 	"google.golang.org/grpc"
@@ -185,27 +184,8 @@ func (*grpcResolver) ResolveNow(o resolver.ResolveNowOptions) {}
 func (*grpcResolver) Close()                                  {}
 
 func convertTxToSendTxArgsProto(transaction *Transaction) *api.SendTxArgs {
-	fromHpcAccount := new(types.HPCAccount)
-	fromHpcAccount.IsDID = transaction.isDID
-	fromHpcAccount.Address = common.HexToAddress(transaction.from)
-	did := types.NewDIDAccount()
-	did.UnmarshalJSON([]byte(transaction.from))
-	fromHpcAccount.DidAccount = did
-	fromBytes, err := json.Marshal(fromHpcAccount)
-	if err != nil {
-		return nil
-	}
-
-	toHpcAccount := new(types.HPCAccount)
-	toHpcAccount.IsDID = transaction.isDID
-	toHpcAccount.Address = common.HexToAddress(transaction.to)
-	did = types.NewDIDAccount()
-	did.UnmarshalJSON([]byte(transaction.to))
-	toHpcAccount.DidAccount = did
-	toBytes, err := json.Marshal(toHpcAccount)
-	if err != nil {
-		return nil
-	}
+	fromBytes := []byte(transaction.from)
+	toBytes := []byte(transaction.to)
 
 	return &api.SendTxArgs{
 		From:               string(fromBytes),

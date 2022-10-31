@@ -12,8 +12,9 @@ const (
 )
 
 const (
-	JSONRPCNodes = "jsonRPC.nodes"
-	JSONRPCPorts = "jsonRPC.ports"
+	JSONRPCNodes    = "jsonRPC.nodes"
+	JSONRPCPorts    = "jsonRPC.ports"
+	JSONRPCPriority = "jsonRPC.priority"
 )
 
 const (

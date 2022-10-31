@@ -68,3 +68,28 @@ func DecodeProposalCode(code []byte) (string, error) {
 	res, err := json.Marshal(result)
 	return string(res), err
 }
+
+// DecodePayload
+// payload struct as below
+// methodName length(4 bytes) | methodName | params count(4 bytes) | (paramX length(4 bytes) | paramX)...
+func DecodePayload(payloadBytes []byte) (Operation, error) {
+	const defaultLen = 4
+	nameLen := common.BytesToInt32(payloadBytes[0:defaultLen])
+	index := defaultLen
+	methodName := string(payloadBytes[index : index+nameLen])
+	index += nameLen
+	paramsCount := common.BytesToInt32(payloadBytes[index : index+defaultLen])
+	index += defaultLen
+	var params []string
+	for j := 0; j < paramsCount; j++ {
+		paramLen := common.BytesToInt32(payloadBytes[index : index+defaultLen])
+		index += defaultLen
+		param := string(payloadBytes[index : index+paramLen])
+		index += paramLen
+		params = append(params, param)
+	}
+	s := NewOperation()
+	s.SetMethod(ContractMethod(methodName))
+	s.SetArgs(params)
+	return s, nil
+}

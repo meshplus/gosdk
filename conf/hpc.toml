@@ -13,6 +13,10 @@ reConnectTime = 10000
     # local ports
    ports = ["8081", "8082", "8083", "8084"]
 
+   # set node used priority, we will send request to nodes with this list
+   priority = [0, 0, 0, 0]
+
+
 [webSocket]
     # webSocket connect port
     ports = ["10001", "10002", "10003", "10004"]

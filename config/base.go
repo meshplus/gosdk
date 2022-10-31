@@ -4,13 +4,14 @@ import (
 	"errors"
 	"fmt"
 	"github.com/meshplus/gosdk/common"
-	"github.com/terasum/viper"
+	"github.com/spf13/viper"
 	"path/filepath"
 )
 
 type jsonRpc struct {
-	node  []string
-	ports []string
+	node     []string
+	ports    []string
+	priority []int
 }
 
 type webSocket struct {
@@ -98,8 +99,9 @@ func Default() *Config {
 		namespace:     "global",
 		reConnectTime: 10000,
 		jsonRpc: jsonRpc{
-			node:  []string{"localhost", "localhost", "localhost", "localhost"},
-			ports: []string{"8081", "8082", "8083", "8084"},
+			node:     []string{"localhost", "localhost", "localhost", "localhost"},
+			ports:    []string{"8081", "8082", "8083", "8084"},
+			priority: []int{0, 0, 0, 0},
 		},
 		webSocket: webSocket{
 			ports: []string{"10001", "10002", "10003", "10004"},
@@ -213,6 +215,10 @@ func (c *Config) loadJsonRPC() {
 	if c.vi.Get(common.JSONRPCPorts) != nil {
 		c.jsonRpc.ports = c.vi.GetStringSlice(common.JSONRPCPorts)
 	}
+
+	if c.vi.Get(common.JSONRPCPriority) != nil {
+		c.jsonRpc.priority = c.vi.GetIntSlice(common.JSONRPCPriority)
+	}
 }
 
 func (c *Config) GetNodes() []string {
@@ -221,6 +227,10 @@ func (c *Config) GetNodes() []string {
 
 func (c *Config) GetRPCPorts() []string {
 	return c.jsonRpc.ports
+}
+
+func (c *Config) GetPriority() []int {
+	return c.jsonRpc.priority
 }
 
 func (c *Config) loadWebSocket() {

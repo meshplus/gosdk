@@ -20,7 +20,7 @@ type Key interface {
 }
 
 type PKIKey struct {
-	sk             crypto.Signer
+	crypto.Signer
 	addr           common.Address
 	encodedprivkey string
 	rawcert        string
@@ -40,7 +40,7 @@ func (key *PKIKey) GetAddress() common.Address {
 }
 
 func (key *PKIKey) GetNormalKey() Key {
-	switch sk := key.sk.(type) {
+	switch sk := key.Signer.(type) {
 	case *asym.ECDSAPrivateKey:
 		return &ECDSAKey{sk}
 	case *gm.SM2PrivateKey:
@@ -51,11 +51,11 @@ func (key *PKIKey) GetNormalKey() Key {
 }
 
 func (key *PKIKey) PublicBytes() ([]byte, error) {
-	return key.sk.Bytes()
+	return key.Signer.Bytes()
 }
 
 func (key *PKIKey) PrivateBytes() ([]byte, error) {
-	switch sk := key.sk.(type) {
+	switch sk := key.Signer.(type) {
 	case *asym.ECDSAPrivateKey:
 		return sk.Bytes()
 	case *gm.SM2PrivateKey:
@@ -98,7 +98,10 @@ func (key *SM2Key) GetAddress() common.Address {
 	if err != nil {
 		return common.Address{}
 	}
-	h, _ := hash.NewHasher(hash.KECCAK_256).Hash(bs)
+	h, err := hash.NewHasher(hash.KECCAK_256).Hash(bs)
+	if err != nil {
+		return common.Address{}
+	}
 	return common.BytesToAddress(h[12:])
 }
 

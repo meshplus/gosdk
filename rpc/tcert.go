@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"github.com/meshplus/gosdk/common"
-	"github.com/terasum/viper"
+	"github.com/spf13/viper"
 )
 
 // TCert tcert message

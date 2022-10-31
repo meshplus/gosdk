@@ -3,7 +3,7 @@ package bvm
 import (
 	"bytes"
 	"github.com/mitchellh/mapstructure"
-	"github.com/terasum/viper"
+	"github.com/spf13/viper"
 	"time"
 )
 

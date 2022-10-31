@@ -25,8 +25,14 @@ const (
 	//JSONRPCInternalErrorCode    = -32603
 	DataNotExistCode          = -32001
 	BalanceInsufficientCode   = -32002
+	InvalidSignature          = -32003
 	SystemBusyCode            = -32006
 	DuplicateTransactionsCode = -32007
+	InvalidParams             = -32602
+	ConsensusStatusAbnormal   = -32024
+	QPSLimit                  = -32026
+	DispatcherFull            = -32025
+	SimulateLimit             = -32027
 
 	ALGOTYPE_SM2 = "sm2"
 	ALGOTYPE_EC  = "ecdsa"
@@ -54,9 +60,13 @@ type NodeInfo struct {
 
 // NodeStateInfo records the node status(including consensus status)
 type NodeStateInfo struct {
+	Id          uint64 `json:"id,omitempty"`
+	Hostname    string `json:"hostname,omitempty"`
 	Hash        string `json:"hash"`
 	Status      string `json:"status"` // TIMEOUT, NORMAL, VIEWCHANGE...
 	View        uint64 `json:"view"`
+	Epoch       uint64 `json:"epoch,omitempty"`
+	Checkpoint  uint64 `json:"checkpoint,omitempty"`
 	BlockHeight uint64 `json:"blockHeight"` // latest block height of node
 	BlockHash   string `json:"blockHash"`   // latest block hash of node
 }
@@ -804,7 +814,10 @@ func (credential *DIDCredential) Sign(key interface{}) error {
 	default:
 		return fmt.Errorf("can't use other key type")
 	}
-	sig, _ := SignWithDID(key, hashStr, false, false, isDIDAccount)
+	sig, err := SignWithDID(key, hashStr, false, false, isDIDAccount)
+	if err != nil {
+		return err
+	}
 	credential.Signature = sig
 	return nil
 }

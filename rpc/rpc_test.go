@@ -81,13 +81,10 @@ func TestRPC_GetCode(t *testing.T) {
 	newAddress := h[12:]
 
 	transaction := NewTransaction(common.BytesToAddress(newAddress).Hex()).Deploy(binContract)
-	transaction.Sign(guomiKey)
-	receipt, _ := rpc.DeployContract(transaction)
-	code, err := rpc.GetCode(receipt.ContractAddress)
-	if err != nil {
-		t.Error(err)
-	}
-	fmt.Println(code)
+	receipt, err := rpc.SignAndDeployContract(transaction, guomiKey)
+	assert.Nil(t, err)
+	_, err = rpc.GetCode(receipt.ContractAddress)
+	assert.Nil(t, err)
 }
 
 func TestRPC_GetContractCountByAddr(t *testing.T) {

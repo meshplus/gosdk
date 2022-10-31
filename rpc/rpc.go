@@ -15,7 +15,7 @@ import (
 	"time"
 
 	"github.com/meshplus/gosdk/common"
-	"github.com/terasum/viper"
+	"github.com/spf13/viper"
 )
 
 const (
@@ -162,18 +162,24 @@ func NewRPCWithPath(confRootPath string) *RPC {
 		secondPollTime:     cf.GetSecondPollingTimes(),
 		reConnTime:         cf.GetReConnectTime(),
 		im:                 im,
+		config:             cf,
 	}
 
+	rpc.initGlobal()
+	return rpc
+}
+
+func (rpc *RPC) initGlobal() {
 	txVersion, err := rpc.GetTxVersion()
 	if err != nil {
 		logger.Info("use config txVersion, for", err.Error())
-		txVersion = cf.GetTxVersion()
+		txVersion = rpc.config.GetTxVersion()
 	}
+
 	TxVersion = txVersion
 	rpc.txVersion = txVersion
 	rpc.hrm.txVersion = txVersion
 	logger.Info("set TxVersion to " + TxVersion)
-	return rpc
 }
 
 func newInspectorManager(cf *config.Config, confRootPath string) (im *inspectorManager) {
@@ -312,6 +318,15 @@ func (rpc *RPC) AddNode(url, rpcPort, wsPort string) *RPC {
 	return rpc
 }
 
+func (rpc *RPC) SetNodePriority(id int, priority int) *RPC {
+	if id == 0 {
+		rpc.hrm.nodes[id].SetNodePriority(priority)
+	} else {
+		rpc.hrm.nodes[id-1].SetNodePriority(priority)
+	}
+	return rpc
+}
+
 func (rpc *RPC) Tcert(cfca bool, sdkcertPath, sdkcertPrivPath, uniquePubPath, uniquePrivPath string) *RPC {
 	vip := viper.New()
 	vip.Set(common.PrivacyCfca, cfca)
@@ -380,6 +395,13 @@ func (rpc *RPC) call(method string, params ...interface{}) (json.RawMessage, Std
 	return rpc.callWithReq(req)
 }
 
+// call is a function to get response result commodiously
+func (rpc *RPC) callWithTransaction(method string, transaction *Transaction, params ...interface{}) (json.RawMessage, StdError) {
+	req := rpc.jsonRPC(method, params...)
+	req.transaction = transaction
+	return rpc.callWithReq(req)
+}
+
 // callWithReq is a function to get response origin data
 func (rpc *RPC) callWithReq(req *JSONRequest) (json.RawMessage, StdError) {
 	body, sysErr := json.Marshal(req)
@@ -398,6 +420,22 @@ func (rpc *RPC) callWithReq(req *JSONRequest) (json.RawMessage, StdError) {
 	}
 
 	if resp.Code != SuccessCode {
+		if req.transaction != nil && (resp.Code == InvalidSignature || (resp.Code == InvalidParams && strings.Contains(strings.ToLower(resp.Message), "version"))) {
+			preTxVersion := TxVersion
+			rpc.initGlobal()
+			if req.transaction.txVersion != TxVersion && preTxVersion != TxVersion {
+				req.transaction.setTxVersion(TxVersion)
+				req.transaction.SetSignature("")
+				req.transaction.Sign(req.transaction.account)
+				return rpc.call(req.Method, req.transaction.Serialize())
+			}
+		}
+		if resp.Code == ConsensusStatusAbnormal ||
+			resp.Code == QPSLimit ||
+			resp.Code == DispatcherFull ||
+			resp.Code == SimulateLimit {
+			return rpc.callWithReq(req)
+		}
 		return nil, NewServerError(resp.Code, resp.Message)
 	}
 
@@ -481,6 +519,19 @@ func (rpc *RPC) Call(method string, param interface{}) (*TxReceipt, StdError) {
 	return &receipt, nil
 }
 
+// callTransaction call and get tx receipt directly without polling
+func (rpc *RPC) callTransaction(method string, transaction *Transaction, param interface{}) (*TxReceipt, StdError) {
+	data, err := rpc.callWithTransaction(method, transaction, param)
+	if err != nil {
+		return nil, err
+	}
+	var receipt TxReceipt
+	if sysErr := json.Unmarshal(data, &receipt); sysErr != nil {
+		return nil, NewSystemError(sysErr)
+	}
+	return &receipt, nil
+}
+
 // CallByPolling call and get tx receipt by polling
 func (rpc *RPC) CallByPolling(method string, param interface{}, isPrivateTx bool) (*TxReceipt, StdError) {
 	var (
@@ -508,6 +559,36 @@ func (rpc *RPC) CallByPolling(method string, param interface{}, isPrivateTx bool
 		}
 		//if code is -9999 -32001 and -32006, we should sleep then resend
 		//time.Sleep(time.Millisecond * time.Duration(rpc.firstPollInterval+rpc.secondPollInterval))
+	}
+	return nil, NewRequestTimeoutError(errors.New("request time out"))
+}
+
+// CallByPolling call and get tx receipt by polling
+func (rpc *RPC) callTransactionByPolling(method string, transaction *Transaction, param interface{}) (*TxReceipt, StdError) {
+	var (
+		req    *JSONRequest
+		data   json.RawMessage
+		hash   string
+		err    StdError
+		sysErr error
+	)
+	// if simulate is false, transaction need to resend
+	req = rpc.jsonRPC(method, param)
+	req.transaction = transaction
+	for i := int64(0); i < rpc.resTime; i++ {
+		if data, err = rpc.callWithReq(req); err != nil {
+			return nil, err
+		} else {
+			if sysErr = json.Unmarshal(data, &hash); sysErr != nil {
+				return nil, NewSystemError(sysErr)
+			}
+			txReceipt, innErr, success := rpc.GetTxReceiptByPolling(hash, transaction.isPrivateTx)
+			err = innErr
+			if success {
+				return txReceipt, err
+			}
+			continue
+		}
 	}
 	return nil, NewRequestTimeoutError(errors.New("request time out"))
 }
@@ -914,7 +995,7 @@ func (rpc *RPC) GetAvgGenTimeByBlockNum(from, to uint64) (int64, StdError) {
 		return -1, stdErr
 	}
 
-	str := strings.Replace(string(data), "\"", "", 2)
+	str := strings.Trim(string(data), "\"")
 
 	if strings.Index(str, "0x") == 0 || strings.Index(str, "-0x") == 0 {
 		str = strings.Replace(str, "0x", "", 1)
@@ -1077,7 +1158,7 @@ func (rpc *RPC) GetTransactionsByBlkNumWithLimit(start, end uint64, metadata *Me
 	qtr := &QueryTxRange{
 		From:     start,
 		To:       end,
-		metadata: metadata,
+		Metadata: metadata,
 	}
 	method := TRANSACTION + "getTransactionsWithLimit"
 	param := qtr.Serialize()
@@ -1099,7 +1180,7 @@ func (rpc *RPC) GetInvalidTransactionsByBlkNumWithLimit(start, end uint64, metad
 	qtr := &QueryTxRange{
 		From:     start,
 		To:       end,
-		metadata: metadata,
+		Metadata: metadata,
 	}
 	method := TRANSACTION + "getInvalidTransactionsWithLimit"
 	param := qtr.Serialize()
@@ -1419,8 +1500,7 @@ func (rpc *RPC) GetBlkTxCountByNumber(blkNum string) (uint64, StdError) {
 // GetSignHash 获取交易签名哈希
 func (rpc *RPC) GetSignHash(transaction *Transaction) (string, StdError) {
 	method := TRANSACTION + "getSignHash"
-	param := transaction.Serialize()
-	data, err := rpc.call(method, param)
+	data, err := rpc.callWithTransaction(method, transaction, transaction.Serialize())
 	if err != nil {
 		return "", err
 	}
@@ -1793,9 +1873,9 @@ func (rpc *RPC) SendTx(transaction *Transaction) (*TxReceipt, StdError) {
 	method := TRANSACTION + "sendTransaction"
 	param := transaction.Serialize()
 	if transaction.simulate {
-		return rpc.Call(method, param)
+		return rpc.callTransaction(method, transaction, param)
 	}
-	return rpc.CallByPolling(method, param, transaction.isPrivateTx)
+	return rpc.callTransactionByPolling(method, transaction, param)
 }
 
 // SignAndSendTx 同步发送交易并签名
@@ -1805,9 +1885,9 @@ func (rpc *RPC) SignAndSendTx(transaction *Transaction, key interface{}) (*TxRec
 	method := TRANSACTION + "sendTransaction"
 	param := transaction.Serialize()
 	if transaction.simulate {
-		return rpc.Call(method, param)
+		return rpc.callTransaction(method, transaction, param)
 	}
-	return rpc.CallByPolling(method, param, transaction.isPrivateTx)
+	return rpc.callTransactionByPolling(method, transaction, param)
 }
 
 /*---------------------------------- contract ----------------------------------*/
@@ -1846,9 +1926,9 @@ func (rpc *RPC) DeployContract(transaction *Transaction) (*TxReceipt, StdError) 
 	transaction.isDeploy = true
 	param := transaction.Serialize()
 	if transaction.simulate {
-		return rpc.Call(method, param)
+		return rpc.callTransaction(method, transaction, param)
 	}
-	return rpc.CallByPolling(method, param, transaction.isPrivateTx)
+	return rpc.callTransactionByPolling(method, transaction, param)
 }
 
 // SignAndDeployContract Deploy contract rpc
@@ -1868,9 +1948,9 @@ func (rpc *RPC) SignAndDeployContract(transaction *Transaction, key interface{})
 	transaction.isDeploy = true
 	param := transaction.Serialize()
 	if transaction.simulate {
-		return rpc.Call(method, param)
+		return rpc.callTransaction(method, transaction, param)
 	}
-	return rpc.CallByPolling(method, param, transaction.isPrivateTx)
+	return rpc.callTransactionByPolling(method, transaction, param)
 }
 
 // SignAndDeployCrossChainContract deploy cross_chain contract rpc
@@ -1890,9 +1970,9 @@ func (rpc *RPC) SignAndDeployCrossChainContract(transaction *Transaction, key in
 	transaction.isDeploy = true
 	param := transaction.Serialize()
 	if transaction.simulate {
-		return rpc.Call(method, param)
+		return rpc.callTransaction(method, transaction, param)
 	}
-	return rpc.CallByPolling(method, param, transaction.isPrivateTx)
+	return rpc.callTransactionByPolling(method, transaction, param)
 }
 
 // SignAndInvokeContract invoke contract rpc
@@ -1913,9 +1993,9 @@ func (rpc *RPC) SignAndInvokeContract(transaction *Transaction, key interface{})
 	param := transaction.Serialize()
 
 	if transaction.simulate {
-		return rpc.Call(method, param)
+		return rpc.callTransaction(method, transaction, param)
 	}
-	return rpc.CallByPolling(method, param, transaction.isPrivateTx)
+	return rpc.callTransactionByPolling(method, transaction, param)
 }
 
 func (rpc *RPC) SignAndInvokeCrossChainContract(transaction *Transaction, methodName CrossChainMethod, key interface{}) (*TxReceipt, StdError) {
@@ -1929,9 +2009,9 @@ func (rpc *RPC) SignAndInvokeCrossChainContract(transaction *Transaction, method
 	param := transaction.Serialize()
 
 	if transaction.simulate {
-		return rpc.Call(method, param)
+		return rpc.callTransaction(method, transaction, param)
 	}
-	return rpc.CallByPolling(method, param, transaction.isPrivateTx)
+	return rpc.callTransactionByPolling(method, transaction, param)
 }
 
 // InvokeCrossChainContractReturnHash for pressure test
@@ -1939,7 +2019,7 @@ func (rpc *RPC) SignAndInvokeCrossChainContract(transaction *Transaction, method
 func (rpc *RPC) InvokeCrossChainContractReturnHash(transaction *Transaction, methodName CrossChainMethod) (string, StdError) {
 	method := CROSS_CHAIN + methodName
 	param := transaction.Serialize()
-	data, err := rpc.call(method.String(), param)
+	data, err := rpc.callWithTransaction(method.String(), transaction, param)
 	if err != nil {
 		return "", err
 	}
@@ -1982,9 +2062,9 @@ func (rpc *RPC) InvokeContract(transaction *Transaction) (*TxReceipt, StdError) 
 	param := transaction.Serialize()
 
 	if transaction.simulate {
-		return rpc.Call(method, param)
+		return rpc.callTransaction(method, transaction, param)
 	}
-	return rpc.CallByPolling(method, param, transaction.isPrivateTx)
+	return rpc.callTransactionByPolling(method, transaction, param)
 }
 
 // ManageContractByVote manage contract by vote rpc
@@ -1995,9 +2075,9 @@ func (rpc *RPC) ManageContractByVote(transaction *Transaction) (*TxReceipt, StdE
 	param := transaction.Serialize()
 
 	if transaction.simulate {
-		return rpc.Call(method, param)
+		return rpc.callTransaction(method, transaction, param)
 	}
-	return rpc.CallByPolling(method, param, transaction.isPrivateTx)
+	return rpc.callTransactionByPolling(method, transaction, param)
 }
 
 // SignAndManageContractByVote manage contract by vote rpc
@@ -2009,9 +2089,9 @@ func (rpc *RPC) SignAndManageContractByVote(transaction *Transaction, key interf
 	param := transaction.Serialize()
 
 	if transaction.simulate {
-		return rpc.Call(method, param)
+		return rpc.callTransaction(method, transaction, param)
 	}
-	return rpc.CallByPolling(method, param, transaction.isPrivateTx)
+	return rpc.callTransactionByPolling(method, transaction, param)
 }
 
 // GetCode 获取合约字节编码
@@ -2104,9 +2184,9 @@ func (rpc *RPC) MaintainContract(transaction *Transaction) (*TxReceipt, StdError
 	transaction.isMaintain = true
 	param := transaction.Serialize()
 	if transaction.simulate {
-		return rpc.Call(method, param)
+		return rpc.callTransaction(method, transaction, param)
 	}
-	return rpc.CallByPolling(method, param, transaction.isPrivateTx)
+	return rpc.callTransactionByPolling(method, transaction, param)
 }
 
 // SignAndMaintainContract 管理合约 opcode
@@ -2125,9 +2205,9 @@ func (rpc *RPC) SignAndMaintainContract(transaction *Transaction, key interface{
 	transaction.isMaintain = true
 	param := transaction.Serialize()
 	if transaction.simulate {
-		return rpc.Call(method, param)
+		return rpc.callTransaction(method, transaction, param)
 	}
-	return rpc.CallByPolling(method, param, transaction.isPrivateTx)
+	return rpc.callTransactionByPolling(method, transaction, param)
 }
 
 // GetContractStatus 获取合约状态
@@ -2233,8 +2313,11 @@ func (rpc *RPC) GetDeployedList(address string) ([]string, StdError) {
 // Deprecated:
 func (rpc *RPC) InvokeContractReturnHash(transaction *Transaction) (string, StdError) {
 	method := CONTRACT + "invokeContract"
+	if transaction.simulate {
+		method = SIMULATE + "invokeContract"
+	}
 	param := transaction.Serialize()
-	data, err := rpc.call(method, param)
+	data, err := rpc.callWithTransaction(method, transaction, param)
 	if err != nil {
 		return "", err
 	}
@@ -2252,7 +2335,7 @@ func (rpc *RPC) InvokeContractReturnHash(transaction *Transaction) (string, StdE
 func (rpc *RPC) SendTxReturnHash(transaction *Transaction) (string, StdError) {
 	method := TRANSACTION + "sendTransaction"
 	param := transaction.Serialize()
-	data, err := rpc.call(method, param)
+	data, err := rpc.callWithTransaction(method, transaction, param)
 	if err != nil {
 		return "", err
 	}
@@ -2331,6 +2414,8 @@ func (rpc *RPC) GetWebSocketClient() *WebSocketClient {
 /*---------------------------------- mq ----------------------------------*/
 
 // GetMqClient 获取mq客户端
+// Deprecated, for this mq client can be used for rabbit as well, but can not use for kafka
+// use NewRabbitMqClient instead
 func (rpc *RPC) GetMqClient() *MqClient {
 	once.Do(func() {
 		mqClient = &MqClient{
@@ -2340,6 +2425,14 @@ func (rpc *RPC) GetMqClient() *MqClient {
 	})
 
 	return mqClient
+}
+
+func (rpc *RPC) NewRabbitMqClient() *RabbitClient {
+	return &RabbitClient{&baseMq{hrm: &rpc.hrm}}
+}
+
+func (rpc *RPC) NewKafkaMqClient() *KafkaClient {
+	return &KafkaClient{&baseMq{hrm: &rpc.hrm}}
 }
 
 /*---------------------------------- archive ----------------------------------*/
@@ -3063,9 +3156,9 @@ func (rpc *RPC) SendDIDTransaction(transaction *Transaction, key interface{}) (*
 	method := DID + "sendDIDTransaction"
 	param := transaction.Serialize()
 	if transaction.simulate {
-		return rpc.Call(method, param)
+		return rpc.callTransaction(method, transaction, param)
 	}
-	return rpc.CallByPolling(method, param, transaction.isPrivateTx)
+	return rpc.callTransactionByPolling(method, transaction, param)
 }
 
 func (rpc *RPC) GetNodeChainID() (string, StdError) {

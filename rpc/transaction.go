@@ -98,6 +98,7 @@ type Transaction struct {
 	participants []string
 	isPrivateTx  bool
 	optionExtra  string
+	account      interface{}
 }
 
 func (t *Transaction) GetFrom() string {
@@ -293,6 +294,13 @@ func (t *Transaction) MaintainByName(op int64, name, payload string) *Transactio
 func (t *Transaction) Deploy(payload string) *Transaction {
 	t.payload = chPrefix(payload)
 	t.isDeploy = true
+	return t
+}
+
+// DeployWithArgs deploy contract with params encoded bytes.
+func (t *Transaction) DeployWithArgs(bin []byte, params []byte) *Transaction {
+	bin = append(bin, params...)
+	t.Deploy(common.Bytes2Hex(bin))
 	return t
 }
 
@@ -670,14 +678,17 @@ func (p *processorWithFlato22) process(buffer *strings.Builder, t *Transaction) 
 }
 
 func getProcessor(txVersion string) processor {
-	if txVersion < "2" {
+	if CompareTxVersion(txVersion, "2.0") < 0 {
 		return newProcessorWithHyperchain()
 	}
-	if txVersion < "2.1" {
+	if CompareTxVersion(txVersion, "2.1") < 0 {
 		return newProcessorWithFlato()
 	}
-	if txVersion < "2.2" {
+	if CompareTxVersion(txVersion, "2.2") < 0 {
 		return newProcessorWithFlato21()
+	}
+	if CompareTxVersion(txVersion, "3.5") <= 0 {
+		return newProcessorWithFlato22()
 	}
 	return newProcessorWithFlato22()
 }
@@ -722,6 +733,7 @@ func (t *Transaction) SignWithBatchFlag(key interface{}) {
 }
 
 func (t *Transaction) sign(key interface{}, batch bool) {
+	t.account = key
 	if t.isPrivateTx {
 		K, ok := key.(account.Key)
 		if !ok {

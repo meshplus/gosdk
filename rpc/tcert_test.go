@@ -3,8 +3,8 @@ package rpc
 import (
 	"fmt"
 	"github.com/meshplus/gosdk/common"
+	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
-	"github.com/terasum/viper"
 	"path/filepath"
 	"testing"
 )

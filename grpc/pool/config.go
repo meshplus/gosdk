@@ -2,7 +2,7 @@ package pool
 
 import (
 	"github.com/meshplus/gosdk/config"
-	"github.com/terasum/viper"
+	"github.com/spf13/viper"
 	"strings"
 	"time"
 )
