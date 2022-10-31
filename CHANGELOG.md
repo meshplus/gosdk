@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+<a name="1.4.0"></a>
+# [1.4.0](http://git.hyperchain.cn/hyperchain/gosdk/compare/v1.3.0...v1.4.0) (2022-10-31)
+
+
+### Features
+
+* add some feat ([fc868e0](http://git.hyperchain.cn/hyperchain/gosdk/commits/fc868e0))
+
+
+
 <a name="1.3.0"></a>
 # [1.3.0](http://git.hyperchain.cn/hyperchain/gosdk/compare/v1.2.2...v1.3.0) (2022-07-06)
 
