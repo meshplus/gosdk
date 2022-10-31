@@ -442,6 +442,10 @@ func formatTypeString(tyName TypeString) TypeString {
 		return PrimitiveName
 	case "array":
 		return ArrayName
+	case "enum":
+		return EnumName
+	case "tuple":
+		return TupleName
 	default:
 		return NoneName
 	}
@@ -491,6 +495,10 @@ func changeStringToType(tyName TypeString) PrimitiveType {
 		return Primitive
 	case "array":
 		return Array
+	case "enum":
+		return Enum
+	case "tuple":
+		return Tuple
 	default:
 		return None
 	}
@@ -498,7 +506,7 @@ func changeStringToType(tyName TypeString) PrimitiveType {
 
 func GetCompactValue(val Compact) interface{} {
 	switch val.GetType() {
-	case ArrayName, VecName, StructName:
+	case ArrayName, VecName, StructName, TupleName:
 		var values []interface{}
 		for _, v1 := range val.GetVal().([]Compact) {
 			values = append(values, GetCompactValue(v1))

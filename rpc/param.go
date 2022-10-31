@@ -7,9 +7,9 @@ import (
 
 // QueryTxRange packaged query transaction by block number range
 type QueryTxRange struct {
-	From     uint64
-	To       uint64
-	metadata *Metadata
+	From     uint64    `json:"from"`
+	To       uint64    `json:"to"`
+	Metadata *Metadata `json:"metadata,omitempty"`
 }
 
 // Serialize serialize to map
@@ -17,12 +17,14 @@ func (qtr *QueryTxRange) Serialize() interface{} {
 	param := make(map[string]interface{})
 	param["from"] = qtr.From
 	param["to"] = qtr.To
+	param["metadata"] = qtr.Metadata
 	return param
 }
 
 // SerializeToString serialize to string
 func (qtr *QueryTxRange) SerializeToString() string {
-	return ""
+	ret, _ := json.Marshal(qtr)
+	return string(ret)
 }
 
 // mapParam packaged key-value pair param

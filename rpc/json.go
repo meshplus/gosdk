@@ -12,12 +12,13 @@ const (
 
 // JSONRequest is used to package http request
 type JSONRequest struct {
-	Method    string          `json:"method"`
-	Version   string          `json:"jsonrpc"`
-	ID        int             `json:"id,omitempty"`
-	Namespace string          `json:"namespace,omitempty"`
-	Params    []interface{}   `json:"params,omitempty"`
-	Auth      *Authentication `json:"auth,omitempty"`
+	Method      string          `json:"method"`
+	Version     string          `json:"jsonrpc"`
+	ID          int             `json:"id,omitempty"`
+	Namespace   string          `json:"namespace,omitempty"`
+	Params      []interface{}   `json:"params,omitempty"`
+	Auth        *Authentication `json:"auth,omitempty"`
+	transaction *Transaction
 }
 
 // Authentication contains params for api auth

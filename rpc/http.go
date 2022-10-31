@@ -12,6 +12,7 @@ import (
 	"io/ioutil"
 	"net"
 	"net/http"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -29,9 +30,11 @@ const (
 
 // Node is used to contain node info
 type Node struct {
-	url    string
-	wsURL  string
-	status bool
+	url         string
+	wsURL       string
+	status      bool
+	priority    int
+	originIndex int
 }
 
 func newNode(url string, rpcPort string, wsPort string, isHTTPS bool) (node *Node) {
@@ -54,6 +57,10 @@ func newNode(url string, rpcPort string, wsPort string, isHTTPS bool) (node *Nod
 // NewNode create a new node
 func NewNode(url string, rpcPort string, wsPort string) (node *Node) {
 	return newNode(url, rpcPort, wsPort, false)
+}
+
+func (n *Node) SetNodePriority(pri int) {
+	n.priority = pri
 }
 
 // httpRequestManager is used to manager node and http request
@@ -94,12 +101,17 @@ func newHTTPRequestManager(cf *config.Config, confRootPath string) (hrm *httpReq
 	isHTTPS = cf.IsHttps()
 	logger.Debugf("[CONFIG]: %s = %v", common.SecurityHttps, isHTTPS)
 
+	priorityList := cf.GetPriority()
+	logger.Debugf("[CONFIG]: %s = %v", common.JSONRPCPriority, priorityList)
+
 	reConnTime := cf.GetReConnectTime()
 
 	var nodes = make([]*Node, len(urls))
 
 	for i, url := range urls {
 		nodes[i] = newNode(url, rpcPorts[i], wsPorts[i], isHTTPS)
+		nodes[i].priority = priorityList[i]
+		nodes[i].originIndex = i
 	}
 
 	sendTcert := cf.IsSendTcert()
@@ -200,7 +212,7 @@ func defaultHTTPRequestManager() *httpRequestManager {
 }
 
 func post(url string, body []byte) (*http.Request, StdError) {
-	req, err := http.NewRequest("POST", url, bytes.NewReader(body))
+	req, err := http.NewRequest(http.MethodPost, url, bytes.NewReader(body))
 	return req, NewGetResponseError(err)
 }
 
@@ -214,12 +226,22 @@ func addHeaders(req *http.Request, extraHeaders map[string]string) {
 
 // SyncRequest function is used to send http request
 func (hrm *httpRequestManager) SyncRequest(body []byte) ([]byte, StdError) {
-	randomURL, stdErr := hrm.randomURL()
+	curURL, stdErr := hrm.selectNodeURL()
 	if stdErr != nil {
+		hrm.resetNodeStatus()
 		return nil, stdErr
 	}
 
-	return hrm.SyncRequestSpecificURL(body, randomURL, GENERAL, nil, nil)
+	res, err := hrm.SyncRequestSpecificURL(body, curURL, GENERAL, nil, nil)
+	if err != nil {
+		if strings.Contains(err.Error(), "connection refused") {
+			hrm.nodes[hrm.nodeIndex].status = false
+			return hrm.SyncRequest(body)
+		}
+		return nil, err
+	}
+	hrm.resetNodeStatus()
+	return res, nil
 }
 
 // SyncRequestSpecificURL is used to post request to specific url
@@ -236,7 +258,7 @@ func (hrm *httpRequestManager) SyncRequestSpecificURL(body []byte, url string, r
 		req.Header.Add("content-type", "application/octet-stream")
 	case UPLOAD:
 		var err error
-		req, err = http.NewRequest("POST", url, rwSeeker)
+		req, err = http.NewRequest(http.MethodPost, url, rwSeeker)
 		if err != nil {
 			return nil, NewSystemError(err)
 		}
@@ -393,6 +415,60 @@ func (hrm *httpRequestManager) getTCert(url string) (string, StdError) {
 	return "", NewGetResponseError(errors.New("http failed " + resp.Status))
 }
 
+func (hrm *httpRequestManager) selectNodeURL() (url string, err StdError) {
+	var tempNodes []*Node
+	for _, v := range hrm.nodes {
+		tempNodes = append(tempNodes, v)
+	}
+	sort.SliceStable(tempNodes, func(i, j int) bool {
+		if tempNodes[i].status && tempNodes[j].status {
+			return tempNodes[i].priority > tempNodes[j].priority
+		} else if tempNodes[i].status && !tempNodes[j].status {
+			return tempNodes[i].status
+		} else if !tempNodes[i].status && tempNodes[j].status {
+			return tempNodes[j].status
+		}
+		return false
+	})
+
+	priorityNumMap := make(map[int][]*Node)
+	// for have sorted, priority in the list must be ordered
+	var priorityList []int
+	for _, v := range tempNodes {
+		if _, ok := priorityNumMap[v.priority]; !ok && v.status {
+			priorityList = append(priorityList, v.priority)
+		}
+		if v.status {
+			priorityNumMap[v.priority] = append(priorityNumMap[v.priority], v)
+		}
+	}
+
+	// random with priority
+	for _, v := range priorityList {
+		curNodeList := priorityNumMap[v]
+		nodeNum := len(curNodeList)
+		randomNum := 2 * nodeNum
+		for randomNum > 0 {
+			selectedId := common.RandInt(nodeNum)
+			if curNodeList[selectedId].status {
+				hrm.nodeIndex = curNodeList[selectedId].originIndex
+				return curNodeList[selectedId].url, nil
+			}
+			randomNum--
+		}
+
+		//if random fail, try round
+		for i := 0; i < nodeNum; i++ {
+			if curNodeList[i].status {
+				hrm.nodeIndex = curNodeList[i].originIndex
+				return curNodeList[i].url, nil
+			}
+		}
+	}
+
+	return "", NewGetResponseError(errors.New("all nodes are bad, please check it"))
+}
+
 func (hrm *httpRequestManager) randomURL() (url string, err StdError) {
 	nodeNum := len(hrm.nodes)
 	randomNum := nodeNum * 2
@@ -414,6 +490,12 @@ func (hrm *httpRequestManager) randomURL() (url string, err StdError) {
 	}
 
 	return "", NewGetResponseError(errors.New("all nodes are bad, please check it"))
+}
+
+func (hrm *httpRequestManager) resetNodeStatus() {
+	for i := 0; i < len(hrm.nodes); i++ {
+		hrm.nodes[i].status = true
+	}
 }
 
 // getNodeURL get the url of the node

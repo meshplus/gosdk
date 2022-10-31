@@ -14,6 +14,10 @@ func (a *Abi) decodeType(tp Type, val []byte) (Compact, int, error) {
 		return a.decodeStruct(tp, val)
 	case Array:
 		return a.decodeArray(tp, val)
+	case Tuple:
+		return a.decodeTuple(tp, val)
+	case Enum:
+		return a.decodeEnum(tp, val)
 	default:
 		return nil, 0, errors.New("not supported")
 	}
@@ -120,6 +124,40 @@ func (a *Abi) decodeArray(tp Type, val []byte) (Compact, int, error) {
 		val = val[tempOffset:]
 		offset += tempOffset
 		cc.Val = append(cc.Val, res)
+	}
+
+	return cc, offset, nil
+}
+
+func (a *Abi) decodeTuple(tp Type, val []byte) (Compact, int, error) {
+	cc := &CompactTuple{}
+	var offset int = 0
+	for _, k := range tp.Fields {
+		res, tempOffset, err := a.decodeType(a.Types[k.TypeId], val)
+		if err != nil {
+			return nil, 0, err
+		}
+		val = val[tempOffset:]
+		offset += tempOffset
+		cc.Val = append(cc.Val, res)
+	}
+
+	return cc, offset, nil
+}
+
+func (a *Abi) decodeEnum(tp Type, val []byte) (Compact, int, error) {
+	cc := &CompactEnum{}
+	cc.index = val[0]
+	val = val[1:]
+	var offset int = 1
+	for _, k := range tp.Variants[cc.index] {
+		res, tempOffset, err := a.decodeType(a.Types[k.TypeId], val)
+		if err != nil {
+			return nil, 0, err
+		}
+		val = val[tempOffset:]
+		offset += tempOffset
+		cc.Val = res
 	}
 
 	return cc, offset, nil

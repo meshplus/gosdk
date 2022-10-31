@@ -181,19 +181,6 @@ func NewAccountJson(acType, password string) (string, error) {
 	return string(jsonBytes), nil
 }
 
-// NewDIDAccountJson generate account json by account type
-func NewDIDAccountJson(acType, password string) (string, error) {
-	ac, err := generateAccountJSON(acType, password, true)
-	if err != nil {
-		return "", err
-	}
-	jsonBytes, err := json.Marshal(ac)
-	if err != nil {
-		return "", err
-	}
-	return string(jsonBytes), nil
-}
-
 func generateAccountJSON(acType, password string, isDiD bool) (*accountJSON, error) {
 	if strings.HasPrefix(acType, "0x0") {
 		return generateECAccountJson(acType, password, isDiD)
@@ -355,14 +342,9 @@ func NewAccountJsonFromPfx(password string, pfx []byte) (string, error) {
 	return string(jsonBytes), nil
 }
 
-// GenKeyFromAccountJson generate ecdsa.Key or gm.Key by account type
+// GenKeyFromAccountJson generate ecdsa.Key or gm.Key by account json
 func GenKeyFromAccountJson(accountJson, password string) (key interface{}, err error) {
 	return genKeyFromAccountJson(accountJson, password, false)
-}
-
-// GenDIDKeyFromAccountJson generate ecdsa.Key or gm.Key by account type
-func GenDIDKeyFromAccountJson(accountJson, password string) (key interface{}, err error) {
-	return genKeyFromAccountJson(accountJson, password, true)
 }
 
 func genKeyFromAccountJson(accountJson, password string, isDID bool) (key interface{}, err error) {
@@ -436,10 +418,6 @@ func genKeyFromAccountJson(accountJson, password string, isDID bool) (key interf
 
 func ParseAccountJson(accountJson, password string) (newAccountJson string, err error) {
 	return parseAccountJson(accountJson, password, false)
-}
-
-func ParseDIDAccountJson(accountJson, password string) (newAccountJson string, err error) {
-	return parseAccountJson(accountJson, password, true)
 }
 
 func parseAccountJson(accountJson, password string, isDiD bool) (newAccountJson string, err error) {
@@ -631,16 +609,6 @@ func NewAccount(password string) (string, error) {
 	}
 }
 
-// NewAccountDID create account using ecdsa
-// if password is empty, the encrypted field will be private key.
-func NewAccountDID(password string) (string, error) {
-	if password != "" {
-		return NewDIDAccountJson(ECDES, password)
-	} else {
-		return NewDIDAccountJson(ECRAW, password)
-	}
-}
-
 // NewAccountPKI create account using pfx cert
 func NewAccountPKI(password string, pfx []byte) (key *PKIKey, err error) {
 	if password != "" && pfx != nil {
@@ -663,22 +631,6 @@ func NewAccountFromPriv(priv string) (*ECDSAKey, error) {
 	return &ECDSAKey{key}, nil
 }
 
-func NewDIDAccountFromPriv(priv string) (*ECDSAKey, error) {
-	if priv == "" {
-		return nil, errors.New("private key is nil")
-	}
-	key := new(asym.ECDSAPrivateKey)
-	err := key.FromBytes(common.Hex2Bytes(priv), asym.AlgoP256K1)
-	if err != nil {
-		return nil, errors.New("create ecdsa key failed")
-	}
-	return &ECDSAKey{key}, nil
-}
-
-func NewDIDAccount(key Key, chainID, suffix string) (didKey *DIDKey) {
-	return &DIDKey{Key: key, address: DIDPREFIX + chainID + ":" + suffix}
-}
-
 // NewAccountFromAccountJSON ECDSA Key结构体
 // Deprecated
 func NewAccountFromAccountJSON(accountjson, password string) (key *ECDSAKey, err error) {
@@ -690,36 +642,6 @@ func NewAccountFromAccountJSON(accountjson, password string) (key *ECDSAKey, err
 		return rk, nil
 	}
 	return nil, errors.New("decrypt private key failed")
-	//defer func() {
-	//	if r := recover(); r != nil {
-	//		key = nil
-	//		err = errors.New("decrypt private key failed")
-	//	}
-	//}()
-	//accountjson, err = ParseAccountJson(accountjson, password)
-	//if err != nil && err != omittedError {
-	//	return nil, err
-	//}
-	//
-	//account := new(accountJSON)
-	//err = json.Unmarshal([]byte(accountjson), account)
-	//if err != nil {
-	//	return nil, err
-	//}
-	//
-	//var priv []byte
-	//
-	//if account.Version == "1.0" {
-	//	priv, err = DesDecrypt(common.Hex2Bytes(account.PrivateKey), []byte(password))
-	//	if err != nil {
-	//		return nil, err
-	//	}
-	//} else {
-	//	// version 2.0 means not encrypted
-	//	priv = common.Hex2Bytes(account.PrivateKey)
-	//}
-	//
-	//return NewAccountFromPriv(common.Bytes2Hex(priv))
 }
 
 //NewAccountFromCert new account from pfx cert
@@ -767,7 +689,7 @@ func NewAccountFromCert(pfx []byte, password string) (key *PKIKey, err error) {
 		rawcert:        rawcert,
 		encodedprivkey: encodedprivkey,
 		cert:           cert,
-		sk:             sk.PrivKey,
+		Signer:         sk.PrivKey,
 		addr:           addr,
 	}, nil
 }
@@ -799,7 +721,7 @@ func NewAccountR1(password string) (string, error) {
 	}
 }
 
-// NewAccountFromPriv 从私钥字节数组得到ECDSA Key结构体
+// NewAccountR1FromPriv 从私钥字节数组得到ECDSA Key结构体
 func NewAccountR1FromPriv(priv string) (*ECDSAKey, error) {
 	if priv == "" {
 		return nil, errors.New("private key is nil")

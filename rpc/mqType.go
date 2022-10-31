@@ -89,6 +89,7 @@ func (rm *RegisterMeta) AddAddress(address ...common.Address) *RegisterMeta {
 func (rm *RegisterMeta) SetTopics(pos int, topics ...common.Hash) *RegisterMeta {
 	if len(rm.Topics) >= 4 {
 		fmt.Println(fmt.Errorf("you can only set 4 topics at most"))
+		logger.Error("you can only set 4 topics at most")
 	}
 	rm.Topics = append(rm.Topics, topics)
 	return rm
@@ -170,62 +171,54 @@ func concatNeedHash(rm *RegisterMeta) string {
 
 // arrayToString hash util
 func arrayToString(array interface{}) string {
-	var result string
+	var result bytes.Buffer
 	switch array := array.(type) {
 	case []string:
-		for i, val := range array {
-			if i == len(array)-1 {
-				result += val
-			} else {
-				result += val + "."
-			}
-		}
+		return strings.Join(array, ".")
 	case []int:
 		for i, val := range array {
-			if i == len(array)-1 {
-				result += strconv.Itoa(val)
-			} else {
-				result += strconv.Itoa(val) + "."
+			result.WriteString(strconv.Itoa(val))
+			if i != len(array)-1 {
+				result.WriteString(".")
 			}
 		}
 	case []routingKey:
 		for i, val := range array {
-			if i == len(array)-1 {
-				result += string(val)
-			} else {
-				result += string(val) + "."
+			result.WriteString(string(val))
+			if i != len(array)-1 {
+				result.WriteString(".")
 			}
 		}
 	case []common.Address:
 		for i, val := range array {
-			if i == len(array)-1 {
-				result += val.String()
-			} else {
-				result += val.String() + "." // include "0x"
+			result.WriteString(val.String())
+			if i != len(array)-1 {
+				result.WriteString(".")
 			}
 		}
 	case []common.Hash: // not used
 		for i, val := range array {
-			if i == len(array)-1 {
-				result += val.String()
-			} else {
-				result += val.String() + "."
+			result.WriteString(val.String())
+			if i != len(array)-1 {
+				result.WriteString(".")
 			}
 		}
 	case [][]common.Hash:
-		for _, array := range array {
+		for i, array := range array {
 			for j, item := range array {
-				if j == len(array)-1 {
-					result += item.Hex() + "."
-				} else {
-					result += item.Hex() + ","
+				result.WriteString(item.Hex())
+				if j != len(array)-1 {
+					result.WriteString(".")
 				}
+			}
+			if i != len(array)-1 {
+				result.WriteString(",")
 			}
 		}
 	default:
 		logger.Error("not support type")
 	}
-	return result
+	return result.String()
 }
 
 // Serialize Serialize

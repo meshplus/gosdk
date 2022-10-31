@@ -45,6 +45,8 @@ const (
 	Vec
 	Primitive
 	Array
+	Tuple
+	Enum
 )
 
 type TypeString string
@@ -72,8 +74,13 @@ const (
 	VecName           TypeString = "Vec"
 	PrimitiveName     TypeString = "primitive"
 	ArrayName         TypeString = "Array"
+	TupleName         TypeString = "tuple"
+	EnumName          TypeString = "enum"
 )
 
 func (t TypeString) String() string {
 	return string(t)
 }
+
+// CustomParamsSection custom section named `params` in wasm defined by us.
+const CustomParamsSection = "params"

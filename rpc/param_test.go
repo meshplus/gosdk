@@ -12,7 +12,7 @@ func TestSerlizerToString(t *testing.T) {
 		To:   2,
 	}
 	param := qtr.SerializeToString()
-	assert.Equal(t, param, "")
+	assert.Equal(t, param, "{\"from\":1,\"to\":2}")
 }
 
 func TestNnewMapParam(t *testing.T) {
@@ -34,11 +34,15 @@ func TestNewLogsFilter(t *testing.T) {
 }
 
 func TestAarrayToString(t *testing.T) {
-	arrayToString([]string{"1", "1"})
-	arrayToString([]int{1, 1})
-	arrayToString([]common.Address{common.BytesToAddress([]byte{1}), common.BytesToAddress([]byte{1})})
-	arrayToString([]float32{1.1})
-	arrayToString([]common.Hash{common.BytesToHash([]byte{1}), common.BytesToHash([]byte{1})})
+	assert.Equal(t, "1.1", arrayToString([]string{"1", "1"}))
+	assert.Equal(t, "1.1", arrayToString([]int{1, 1}))
+	assert.Equal(t, "0x0000000000000000000000000000000000000001.0x0000000000000000000000000000000000000001", arrayToString([]common.Address{common.BytesToAddress([]byte{1}), common.BytesToAddress([]byte{1})}))
+	assert.Equal(t, "", arrayToString([]float32{1.1}))
+	assert.Equal(t, "0x0000000000000000000000000000000000000000000000000000000000000001.0x0000000000000000000000000000000000000000000000000000000000000001", arrayToString([]common.Hash{common.BytesToHash([]byte{1}), common.BytesToHash([]byte{1})}))
+	assert.Equal(t, "0x0000000000000000000000000000000000000000000000000000000000000001.0x0000000000000000000000000000000000000000000000000000000000000001,0x0000000000000000000000000000000000000000000000000000000000000001.0x0000000000000000000000000000000000000000000000000000000000000001", arrayToString([][]common.Hash{
+		{common.BytesToHash([]byte{1}), common.BytesToHash([]byte{1})},
+		{common.BytesToHash([]byte{1}), common.BytesToHash([]byte{1})},
+	}))
 }
 
 func TestNewSystemStatusFilter(t *testing.T) {

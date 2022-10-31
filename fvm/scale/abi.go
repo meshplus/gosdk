@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/meshplus/gosdk/common"
 	"io"
 )
 
@@ -33,11 +34,12 @@ type Method struct {
 }
 
 type Type struct {
-	Id        uint32     `json:"id"`
-	Type      string     `json:"type"`
-	Fields    []TypeInfo `json:"fields"`
-	ArrayLen  int        `json:"array_len"`
-	Primitive string     `json:"primitive"`
+	Id        uint32       `json:"id"`
+	Type      string       `json:"type"`
+	Fields    []TypeInfo   `json:"fields"`
+	ArrayLen  int          `json:"array_len"`
+	Primitive string       `json:"primitive"`
+	Variants  [][]TypeInfo `json:"variants"`
 }
 
 type Abi struct {
@@ -118,6 +120,13 @@ func (a *Abi) getArray(tp Type, res []TypeString, len int) (int, []TypeString) {
 }
 
 func (a *Abi) Encode(methodName string, params ...interface{}) ([]byte, error) {
+	if methodName == "" {
+		return a.encodeConstruct(params...)
+	}
+	return a.encodeMethod(methodName, params...)
+}
+
+func (a *Abi) encodeMethod(methodName string, params ...interface{}) ([]byte, error) {
 	if methodId, ok := a.methodIndex[methodName]; ok {
 		method := a.Methods[methodId]
 		if len(method.Input) != len(params) {
@@ -151,7 +160,81 @@ func (a *Abi) Encode(methodName string, params ...interface{}) ([]byte, error) {
 	}
 }
 
-func (a *Abi) EncodeCompact(methodName string, params ...Compact) ([]byte, error) {
+func (a *Abi) encodeConstruct(params ...interface{}) ([]byte, error) {
+	var buf bytes.Buffer
+	// section type
+	buf.WriteByte(0)
+
+	sectionLen := len(CustomParamsSection) + 1
+
+	var buf2 bytes.Buffer
+	for i := 0; i < len(a.Contract.Constructor.Input); i++ {
+		tp := a.Contract.Constructor.Input[i]
+		current, err := a.convert(a.Types[tp.TypeId], params[i])
+		if err != nil {
+			return nil, err
+		}
+		tmp, err := encode(current)
+		if err != nil {
+			return nil, err
+		}
+		buf2.Write(tmp)
+		sectionLen += len(tmp)
+	}
+
+	// section len
+	buf.Write(common.EncodeInt32(int32(sectionLen)))
+
+	// section name
+	buf.WriteByte(byte(len(CustomParamsSection)))
+	buf.Write([]byte(CustomParamsSection))
+	// section content
+	head := &CompactString{Val: "N"}
+	headRaw, err := head.Encode()
+	if err != nil {
+		return nil, err
+	}
+	buf.Write(headRaw)
+	buf.Write(buf2.Bytes())
+	return buf.Bytes(), nil
+}
+
+func (a *Abi) encodeConstructCompact(params ...Compact) ([]byte, error) {
+	var buf bytes.Buffer
+	// section type
+	buf.WriteByte(0)
+
+	sectionLen := len(CustomParamsSection) + 1
+
+	var buf2 bytes.Buffer
+	for i := 0; i < len(a.Contract.Constructor.Input); i++ {
+		tp := a.Contract.Constructor.Input[i]
+		_, err := a.checkType(a.Types[tp.TypeId], params[i])
+		if err != nil {
+			return nil, err
+		}
+
+		tmp, err := encode(params[i])
+		if err != nil {
+			return nil, err
+		}
+		buf2.Write(tmp)
+		sectionLen += len(tmp)
+	}
+
+	// section len
+	buf.Write(common.EncodeInt32(int32(sectionLen)))
+
+	// section name
+	buf.WriteByte(byte(len(CustomParamsSection)))
+	buf.Write([]byte(CustomParamsSection))
+
+	// section content
+	buf.Write(buf2.Bytes())
+	return buf.Bytes(), nil
+}
+
+func (a *Abi) encodeMethodCompact(methodName string, params ...Compact) ([]byte, error) {
 	if methodId, ok := a.methodIndex[methodName]; ok {
 		method := a.Methods[methodId]
 		if len(method.Input) != len(params) {
@@ -169,13 +252,9 @@ func (a *Abi) EncodeCompact(methodName string, params ...Compact) ([]byte, error
 		// encode input params
 		for i := 0; i < len(method.Input); i++ {
 			tp := method.Input[i]
-			var cur = a.Types[tp.TypeId].Type
-			switch changeStringToType(TypeString(cur)) {
-			case Vec:
-				_, err := a.checkType(a.Types[tp.TypeId], params[i])
-				if err != nil {
-					return nil, err
-				}
+			_, err := a.checkType(a.Types[tp.TypeId], params[i])
+			if err != nil {
+				return nil, err
 			}
 
 			tmp, err := encode(params[i])
@@ -188,6 +267,13 @@ func (a *Abi) EncodeCompact(methodName string, params ...Compact) ([]byte, error
 	} else {
 		return nil, errors.New("method not exist")
 	}
+}
+
+func (a *Abi) EncodeCompact(methodName string, params ...Compact) ([]byte, error) {
+	if methodName == "" {
+		return a.encodeConstructCompact(params...)
+	}
+	return a.encodeMethodCompact(methodName, params...)
 }
 
 func (a *Abi) DecodeInput(methodName string, val []byte) (*InvokeBean, error) {
@@ -252,6 +338,10 @@ func (a *Abi) convert(curType Type, param interface{}) (Compact, error) {
 		return a.convertToStruct(curType, param)
 	case Array:
 		return a.convertToArray(curType, param)
+	case Tuple:
+		return a.convertToTuple(curType, param)
+	case Enum:
+		return a.convertToEnum(curType, param)
 	default:
 		return nil, errors.New("unsupported type")
 	}
@@ -325,5 +415,50 @@ func (a *Abi) convertToArray(curType Type, param interface{}) (*CompactArray, er
 		return cc, nil
 	} else {
 		return nil, errors.New("param not array")
+	}
+}
+
+func (a *Abi) convertToTuple(curType Type, param interface{}) (*CompactTuple, error) {
+	cc := &CompactTuple{}
+	if val, ok := param.([]interface{}); ok {
+		for i, v := range curType.Fields {
+			tmp, err := a.convert(a.Types[v.TypeId], val[i])
+			if err != nil {
+				return nil, err
+			}
+			cc.Val = append(cc.Val, tmp)
+		}
+		return cc, nil
+	} else {
+		return nil, errors.New("param not tuple")
+	}
+}
+
+func (a *Abi) convertToEnum(curType Type, param interface{}) (*CompactEnum, error) {
+	cc := &CompactEnum{}
+	if val, ok := param.([]interface{}); ok {
+		index, err := convertToUint8(val[0])
+		if err != nil {
+			return nil, err
+		}
+		cc.index = index.Val
+		for i, v := range curType.Variants[cc.index] {
+			tmp, err := a.convert(a.Types[v.TypeId], val[i+1])
+			if err != nil {
+				return nil, err
+			}
+			cc.Val = tmp
+		}
+		return cc, nil
+	} else {
+		return nil, errors.New("param not enum")
+	}
+}
+
+func (a *Abi) GetMethod(name string) (*Method, error) {
+	if methodId, ok := a.methodIndex[name]; ok {
+		return &a.Methods[methodId], nil
+	} else {
+		return nil, errors.New("method not exist")
 	}
 }

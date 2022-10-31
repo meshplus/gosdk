@@ -152,6 +152,10 @@ type Operation interface {
 
 	// Args return args for call method
 	Args() []string
+
+	SetMethod(ContractMethod)
+
+	SetArgs([]string)
 }
 
 type BuiltinOperation interface {
@@ -715,10 +719,25 @@ type operationImpl struct {
 	args   []string
 }
 
+func NewOperation() Operation {
+	return &operationImpl{
+		method: "",
+		args:   nil,
+	}
+}
+
 func (o *operationImpl) Method() ContractMethod {
 	return o.method
 }
 
 func (o *operationImpl) Args() []string {
 	return o.args
+}
+
+func (o *operationImpl) SetArgs(params []string) {
+	o.args = params
+}
+
+func (o *operationImpl) SetMethod(method ContractMethod) {
+	o.method = method
 }
