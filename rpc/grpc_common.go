@@ -329,7 +329,7 @@ func (g *GRPC) prepareMqCommReq(meta interface{}) (*api.CommonReq, error) {
 	return commonReq, nil
 }
 
-func (g *GRPC) sendAndRecvReturnString(stream *pool.IdleStream, sendTxArgsProto *api.SendTxArgs) (string, StdError) {
+func (g *GRPC) sendAndRecvReturnString(stream *pool.IdleStream, sendTxArgsProto *api.SendTxArgs, method string) (string, StdError) {
 	if stream == nil {
 		return "", NewSystemError(errors.New("system is busy"))
 	}
@@ -338,7 +338,7 @@ func (g *GRPC) sendAndRecvReturnString(stream *pool.IdleStream, sendTxArgsProto 
 		grpcLogger.Errorf("prepareCommonReq err %v", err1)
 		return "", err1
 	}
-	grpcLogger.Debugf("[REQUEST] %+v", commonReq)
+	grpcLogger.Debugf("[REQUEST] method: %s, req: %+v", method, commonReq)
 	err := stream.GetStream().Send(commonReq)
 	if err != nil {
 		grpcLogger.Errorf("Send err %v", err)
@@ -358,7 +358,7 @@ func (g *GRPC) sendAndRecvReturnString(stream *pool.IdleStream, sendTxArgsProto 
 	return common.BytesToHash(ans.Result).Hex(), nil
 }
 
-func (g *GRPC) sendAndRecv(stream *pool.IdleStream, sendTxArgsProto *api.SendTxArgs) (*TxReceipt, StdError) {
+func (g *GRPC) sendAndRecv(stream *pool.IdleStream, sendTxArgsProto *api.SendTxArgs, method string) (*TxReceipt, StdError) {
 	if stream == nil {
 		return nil, NewSystemError(errors.New("system is busy"))
 	}
@@ -367,7 +367,7 @@ func (g *GRPC) sendAndRecv(stream *pool.IdleStream, sendTxArgsProto *api.SendTxA
 		grpcLogger.Errorf("prepareCommonReq err %v", err1)
 		return nil, err1
 	}
-	grpcLogger.Debugf("[REQUEST] %+v", commonReq)
+	grpcLogger.Debugf("[REQUEST] method: %s, req: %+v", method, commonReq)
 	err := stream.GetStream().Send(commonReq)
 	if err != nil {
 		grpcLogger.Errorf("Send err %v", err)

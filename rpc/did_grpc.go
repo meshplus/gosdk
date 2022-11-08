@@ -38,7 +38,7 @@ func (d *DidGrpc) SendDIDTransaction(trans *Transaction) (string, StdError) {
 	}
 	defer p.Put(stream)
 	sendTxArgsProto := convertTxToSendTxArgsProto(trans)
-	return d.grpc.sendAndRecvReturnString(stream, sendTxArgsProto)
+	return d.grpc.sendAndRecvReturnString(stream, sendTxArgsProto, "SendDIDTransaction")
 }
 
 func (d *DidGrpc) getSendPool() (*pool.StreamPool, error) {
@@ -81,7 +81,7 @@ func (d *DidGrpc) SendDIDTransactionReturnReceipt(trans *Transaction) (*TxReceip
 	defer p.Put(stream)
 
 	sendTxArgsProto := convertTxToSendTxArgsProto(trans)
-	return d.grpc.sendAndRecv(stream, sendTxArgsProto)
+	return d.grpc.sendAndRecv(stream, sendTxArgsProto, "SendDIDTransactionReturnReceipt")
 }
 
 func (d *DidGrpc) Close() error {

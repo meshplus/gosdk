@@ -60,7 +60,7 @@ func (c *ContractGrpc) DeployContract(trans *Transaction) (string, StdError) {
 	defer p.Put(stream)
 	sendTxArgsProto := convertTxToSendTxArgsProto(trans)
 	sendTxArgsProto.To = "0x0"
-	return c.grpc.sendAndRecvReturnString(stream, sendTxArgsProto)
+	return c.grpc.sendAndRecvReturnString(stream, sendTxArgsProto, "DeployContract")
 }
 
 func (c *ContractGrpc) getDeployAndReceiptPool() (*pool.StreamPool, error) {
@@ -90,7 +90,7 @@ func (c *ContractGrpc) DeployContractReturnReceipt(trans *Transaction) (*TxRecei
 
 	sendTxArgsProto := convertTxToSendTxArgsProto(trans)
 	sendTxArgsProto.To = "0x0"
-	return c.grpc.sendAndRecv(stream, sendTxArgsProto)
+	return c.grpc.sendAndRecv(stream, sendTxArgsProto, "DeployContractReturnReceipt")
 }
 
 func (c *ContractGrpc) getInvokePool() (*pool.StreamPool, error) {
@@ -118,7 +118,7 @@ func (c *ContractGrpc) InvokeContract(trans *Transaction) (string, StdError) {
 	}
 	defer p.Put(stream)
 	sendTxArgsProto := convertTxToSendTxArgsProto(trans)
-	return c.grpc.sendAndRecvReturnString(stream, sendTxArgsProto)
+	return c.grpc.sendAndRecvReturnString(stream, sendTxArgsProto, "InvokeContract")
 }
 
 func (c *ContractGrpc) getInvokeAndReceiptPool() (*pool.StreamPool, error) {
@@ -146,7 +146,7 @@ func (c *ContractGrpc) InvokeContractReturnReceipt(trans *Transaction) (*TxRecei
 	}
 	defer p.Put(stream)
 	sendTxArgsProto := convertTxToSendTxArgsProto(trans)
-	return c.grpc.sendAndRecv(stream, sendTxArgsProto)
+	return c.grpc.sendAndRecv(stream, sendTxArgsProto, "InvokeContractReturnReceipt")
 }
 
 func (c *ContractGrpc) getMaintainPool() (*pool.StreamPool, error) {
@@ -174,7 +174,7 @@ func (c *ContractGrpc) MaintainContract(trans *Transaction) (string, StdError) {
 	}
 	defer p.Put(stream)
 	sendTxArgsProto := convertTxToSendTxArgsProto(trans)
-	return c.grpc.sendAndRecvReturnString(stream, sendTxArgsProto)
+	return c.grpc.sendAndRecvReturnString(stream, sendTxArgsProto, "MaintainContract")
 }
 
 func (c *ContractGrpc) getMaintainAndReceiptPool() (*pool.StreamPool, error) {
@@ -202,7 +202,7 @@ func (c *ContractGrpc) MaintainContractReturnReceipt(trans *Transaction) (*TxRec
 	}
 	defer p.Put(stream)
 	sendTxArgsProto := convertTxToSendTxArgsProto(trans)
-	return c.grpc.sendAndRecv(stream, sendTxArgsProto)
+	return c.grpc.sendAndRecv(stream, sendTxArgsProto, "MaintainContractReturnReceipt")
 }
 
 func (c *ContractGrpc) getManagePool() (*pool.StreamPool, error) {
@@ -230,7 +230,7 @@ func (c *ContractGrpc) ManageContractByVote(trans *Transaction) (string, StdErro
 	}
 	defer p.Put(stream)
 	sendTxArgsProto := convertTxToSendTxArgsProto(trans)
-	return c.grpc.sendAndRecvReturnString(stream, sendTxArgsProto)
+	return c.grpc.sendAndRecvReturnString(stream, sendTxArgsProto, "ManageContractByVote")
 }
 
 func (c *ContractGrpc) getManageAndReceiptPool() (*pool.StreamPool, error) {
@@ -258,7 +258,7 @@ func (c *ContractGrpc) ManageContractByVoteReturnReceipt(trans *Transaction) (*T
 	}
 	defer p.Put(stream)
 	sendTxArgsProto := convertTxToSendTxArgsProto(trans)
-	return c.grpc.sendAndRecv(stream, sendTxArgsProto)
+	return c.grpc.sendAndRecv(stream, sendTxArgsProto, "ManageContractByVoteReturnReceipt")
 }
 
 func (c *ContractGrpc) Close() error {
