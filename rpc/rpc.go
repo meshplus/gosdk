@@ -78,9 +78,10 @@ func (c CrossChainMethod) String() string {
 }
 
 var (
-	logger    = common.GetLogger("rpc")
-	once      = sync.Once{}
-	TxVersion = DefaultTxVersion
+	logger          = common.GetLogger("rpc")
+	once            = sync.Once{}
+	TxVersion       = DefaultTxVersion
+	GasPrice  int64 = 0
 )
 
 // RPC represents rpc apis
@@ -95,6 +96,7 @@ type RPC struct {
 	reConnTime         int64
 	txVersion          string
 	chainID            string
+	gasPrice           int64
 	im                 *inspectorManager
 	config             *config.Config
 }
@@ -175,10 +177,16 @@ func (rpc *RPC) initGlobal() {
 		logger.Info("use config txVersion, for", err.Error())
 		txVersion = rpc.config.GetTxVersion()
 	}
+	gasPrice, err1 := rpc.GetGasPrice()
+	if err1 != nil {
+		logger.Info("get gas price, for", err1.Error())
+	}
 
 	TxVersion = txVersion
 	rpc.txVersion = txVersion
 	rpc.hrm.txVersion = txVersion
+	rpc.gasPrice = gasPrice
+	GasPrice = gasPrice
 	logger.Info("set TxVersion to " + TxVersion)
 }
 
@@ -604,6 +612,19 @@ func (rpc *RPC) GetTxVersion() (string, StdError) {
 		return "", NewSystemError(sysErr)
 	}
 	return txVersion, nil
+}
+
+func (rpc *RPC) GetGasPrice() (int64, error) {
+	method := TRANSACTION + "getGasPrice"
+	data, err := rpc.call(method)
+	if err != nil {
+		return 0, err
+	}
+	var price int64
+	if sysErr := json.Unmarshal(data, &price); sysErr != nil {
+		return 0, NewSystemError(sysErr)
+	}
+	return price, nil
 }
 
 // GetTxReceiptByPolling get tx receipt by polling
@@ -3244,5 +3265,14 @@ func (rpc *RPC) SetLocalChainID() error {
 		return err
 	}
 	rpc.chainID = chainID
+	return nil
+}
+
+func (rpc *RPC) SetGasPrice() error {
+	price, err := rpc.GetGasPrice()
+	if err != nil {
+		return err
+	}
+	rpc.gasPrice = price
 	return nil
 }

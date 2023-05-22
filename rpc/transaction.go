@@ -71,33 +71,37 @@ type Params interface {
 
 // Transaction transaction entity
 type Transaction struct {
-	from          string
-	to            string
-	value         int64
-	payload       string
-	timestamp     int64
-	nonce         int64
-	signature     string
-	opcode        int64
-	vmType        string
-	simulate      bool
-	isValue       bool
-	isDeploy      bool
-	isMaintain    bool
-	isDID         bool
-	isInvoke      bool
-	isByName      bool
-	extra         string
-	kvExtra       *KVExtra
-	hasExtra      bool
-	extraIdInt64  []int64
-	extraIdString []string
-	cName         string
-	txVersion     string
+	from                string
+	to                  string
+	value               int64
+	payload             string
+	timestamp           int64
+	expirationTimestamp int64
+	nonce               int64
+	signature           string
+	opcode              int64
+	vmType              string
+	simulate            bool
+	isValue             bool
+	isDeploy            bool
+	isMaintain          bool
+	isDID               bool
+	isInvoke            bool
+	isByName            bool
+	extra               string
+	kvExtra             *KVExtra
+	hasExtra            bool
+	extraIdInt64        []int64
+	extraIdString       []string
+	cName               string
+	txVersion           string
+	gasPrice            int64
+	gasLimit            int64
 	// private transaction related
 	participants []string
 	isPrivateTx  bool
 	optionExtra  string
+	participant  *Participant
 	account      interface{}
 }
 
@@ -204,6 +208,8 @@ func NewTransaction(from string) *Transaction {
 		vmType:      string(EVM),
 		isPrivateTx: false,
 		txVersion:   TxVersion,
+		gasLimit:    DefaultTxGasLimit,
+		gasPrice:    GasPrice,
 	}
 }
 
@@ -677,6 +683,48 @@ func (p *processorWithFlato22) process(buffer *strings.Builder, t *Transaction) 
 	buffer.WriteString(t.cName)
 }
 
+type processorWithFlato36 struct {
+	flato22 *processorWithFlato22
+}
+
+func newProcessorWithFlato36() *processorWithFlato36 {
+	return &processorWithFlato36{
+		flato22: newProcessorWithFlato22(),
+	}
+}
+
+func (p *processorWithFlato36) process(buffer *strings.Builder, t *Transaction) {
+	p.flato22.process(buffer, t)
+	buffer.WriteString("&price=0x")
+	buffer.WriteString(strconv.FormatInt(t.gasPrice, 16))
+	buffer.WriteString("&gasLimit=0x")
+	buffer.WriteString(strconv.FormatInt(t.gasLimit, 16))
+	buffer.WriteString("&expirationTimestamp=0x")
+	buffer.WriteString(strconv.FormatInt(t.expirationTimestamp, 16))
+	if t.participant == nil {
+		buffer.WriteString("&initiator=&withholding=")
+	} else {
+		buffer.WriteString("&initiator=")
+		buffer.WriteString(convertDIDAddr(t.participant.Initiator))
+		buffer.WriteString("&withholding=")
+		buffer.WriteString("[")
+		for i, v := range t.participant.Withholding {
+			if i != 0 {
+				buffer.WriteString(",")
+			}
+			buffer.WriteString(convertDIDAddr(v))
+		}
+		buffer.WriteString("]")
+	}
+}
+
+func convertDIDAddr(addr []byte) string {
+	if strings.HasPrefix(string(addr), account.DIDPREFIX) {
+		return chPrefix(common.Bytes2Hex(addr))
+	}
+	return hexutil.Encode(addr)
+}
+
 func getProcessor(txVersion string) processor {
 	if CompareTxVersion(txVersion, "2.0") < 0 {
 		return newProcessorWithHyperchain()
@@ -690,7 +738,7 @@ func getProcessor(txVersion string) processor {
 	if CompareTxVersion(txVersion, "3.5") <= 0 {
 		return newProcessorWithFlato22()
 	}
-	return newProcessorWithFlato22()
+	return newProcessorWithFlato36()
 }
 
 func writeBaseFiled(buffer *strings.Builder, t *Transaction, payload string, hasPayload bool) {
@@ -835,6 +883,14 @@ func (t *Transaction) Serialize() interface{} {
 	if t.optionExtra != "" {
 		param["optionExtra"] = t.optionExtra
 	}
+	if t.participant != nil {
+		param["participant"] = t.participant
+	}
+	param["gasPrice"] = t.gasPrice
+	param["gasLimit"] = t.gasLimit
+	param["expirationTimestamp"] = t.expirationTimestamp
+	param["txVersion"] = t.txVersion
+
 	return param
 }
 

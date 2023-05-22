@@ -202,6 +202,11 @@ type StateProof struct {
 	AccountPath types.ProofPath `json:"accountPath"`
 }
 
+type Participant struct {
+	Initiator   []byte   `json:"initiator"`
+	Withholding [][]byte `json:"withholding"`
+}
+
 // TransactionRaw is packaged result of TransactionRaw
 type TransactionRaw struct {
 	Version        string        `json:"version"`               // hyperchain version when the transaction is executed
